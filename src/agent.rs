@@ -1,4 +1,8 @@
-use salt_engine::{game_agent::game_agent::GameAgent, game_state::PlayerId};
+use salt_engine::{
+    game_agent::game_agent::GameAgent,
+    game_logic::{ClientGameEvent, EndTurnEvent},
+    game_state::PlayerId,
+};
 
 pub(crate) struct GuiAgent {
     player_id: PlayerId,
@@ -15,7 +19,7 @@ impl GameAgent for GuiAgent {
         &self,
         game_state: &salt_engine::game_state::GameStatePlayerView,
     ) -> salt_engine::game_logic::ClientGameEvent {
-        todo!()
+        ClientGameEvent::EndTurn(EndTurnEvent)
     }
 
     fn id(&self) -> salt_engine::game_state::PlayerId {

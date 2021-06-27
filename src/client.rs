@@ -1,3 +1,5 @@
+use gdnative::{api::Node, core_types::Variant, Ref, TRef};
+use log::info;
 use salt_engine::game_agent::game_agent::GameAgent;
 use server::{
     connection::Connection,
@@ -5,49 +7,67 @@ use server::{
 };
 use smol::net::TcpStream;
 
-use crate::{agent::GuiAgent, godot_log::GodotLog};
+use crate::{agent::GuiAgent, hello::HelloWorld};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
-pub(crate) fn run() -> Result<()> {
+pub(crate) fn run(node: Ref<Node>) -> Result<()> {
     smol::block_on(async {
+        info!("Connecting to localhost:9000.");
         let stream = TcpStream::connect("localhost:9000").await?;
         let (connection, _) =
             async_tungstenite::client_async("ws://localhost:9000", stream).await?;
 
         let connection = Connection::new(connection);
 
-        handle_connection(connection).await
+        handle_connection(connection, node).await
     })
 }
 
-async fn handle_connection(mut connection: Connection) -> Result<()> {
+async fn handle_connection(mut connection: Connection, node: Ref<Node>) -> Result<()> {
     // Expect a Hello
+    info!("Connected.");
 
+    let node = unsafe { node.assume_safe() };
+    node.emit_signal(
+        "ws_message_received",
+        &[Variant::from_str("I'm the message you received.")],
+    );
+
+    info!("Waiting for server to send my ID...");
     let my_id = match connection.recv::<FromServer>().await {
         Some(FromServer::Hello(my_id)) => my_id,
         _ => panic!("unexpected response from server"),
     };
 
+    info!("Received my ID: {:?}", my_id);
+
     let mut agent: Box<dyn GameAgent> = Box::new(GuiAgent::new_with_id(my_id));
 
     // Send Ready
+    info!("Sending ready message....");
     connection.send(FromClient::Ready).await?;
+    info!("Sending ready message... Done.");
 
     // Expect a GameStart
+    info!("Waiting for GameStart message.");
     let opponent_id = match connection.recv::<FromServer>().await {
         Some(FromServer::GameStart { opponent_id }) => opponent_id,
         other => panic!("unexpected response from server: {:?}", other),
     };
+    info!("Received GameStart message.");
 
     // Expect the game state
+    info!("Waiting for GameStateView.");
     let gamestate_view = match connection.recv::<FromServer>().await {
         Some(FromServer::State(view)) => view,
         _ => panic!("unexpected response from server"),
     };
+    info!("Received GameStateView.");
 
     loop {
         // Wait for signal from server that we can send an action
+        info!("Waiting for next message from server.");
         let msg = connection
             .recv::<FromServer>()
             .await
@@ -63,6 +83,7 @@ async fn handle_connection(mut connection: Connection) -> Result<()> {
 
 async fn handle_turn_start(connection: &mut Connection, agent: &dyn GameAgent) -> Result<()> {
     // Continuously receive actions from the client, until they end their turn.
+    info!("Received TurnStart message from server.");
     loop {
         // Wait for signal from server that we can send an action
         let msg = connection

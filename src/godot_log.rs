@@ -6,7 +6,7 @@ pub(crate) struct GodotLog;
 impl GodotLog {
     pub fn init() {
         log::set_boxed_logger(Box::new(Self)).unwrap();
-        log::set_max_level(LevelFilter::Trace);
+        log::set_max_level(LevelFilter::Debug);
         info!("Godot logger initialized.");
     }
 }
