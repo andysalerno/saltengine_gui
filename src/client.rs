@@ -1,5 +1,11 @@
-use gdnative::{api::Node, core_types::Variant, Ref, TRef};
-use log::info;
+use gdnative::{
+    api::{Node, PackedScene, ResourceLoader},
+    core_types::Variant,
+    object::SubClass,
+    prelude::{ManuallyManaged, ThreadLocal, Unique},
+    Ref, TRef,
+};
+use log::{info, warn};
 use salt_engine::game_agent::game_agent::GameAgent;
 use server::{
     connection::Connection,
@@ -33,6 +39,12 @@ async fn handle_connection(mut connection: Connection, node: Ref<Node>) -> Resul
         "ws_message_received",
         &[Variant::from_str("I'm the message you received.")],
     );
+
+    let box_template = load_scene("res://Box.tscn").unwrap();
+
+    let instance = instance_scene::<Node>(&box_template);
+
+    node.add_child(instance.into_shared(), false);
 
     info!("Waiting for server to send my ID...");
     let my_id = match connection.recv::<FromServer>().await {
@@ -128,4 +140,27 @@ async fn handle_turn_start(connection: &mut Connection, agent: &dyn GameAgent) -
             _ => panic!("Unexpected message from server: {:?}", msg),
         }
     }
+}
+
+pub fn load_scene(path: &str) -> Option<Ref<PackedScene, ThreadLocal>> {
+    let scene = ResourceLoader::godot_singleton().load(path, "PackedScene", false)?;
+
+    let scene = unsafe { scene.assume_thread_local() };
+
+    scene.cast::<PackedScene>()
+}
+
+/// Root here is needs to be the same type (or a parent type) of the node that you put in the child
+///   scene as the root. For instance Spatial is used for this example.
+fn instance_scene<TRoot>(scene: &PackedScene) -> Ref<TRoot, Unique>
+where
+    TRoot: gdnative::GodotObject<RefKind = ManuallyManaged> + SubClass<Node>,
+{
+    let instance = scene
+        .instance(PackedScene::GEN_EDIT_STATE_DISABLED)
+        .unwrap();
+
+    let instance = unsafe { instance.assume_unique() };
+
+    instance.try_cast::<TRoot>().unwrap()
 }
