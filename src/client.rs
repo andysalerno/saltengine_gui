@@ -1,6 +1,6 @@
 use gdnative::{
-    api::{Node, PackedScene, ResourceLoader},
-    core_types::Variant,
+    api::{Node, PackedScene, ResourceLoader, Spatial},
+    core_types::{Variant, Vector3},
     object::SubClass,
     prelude::{ManuallyManaged, ThreadLocal, Unique},
     Ref, TRef,
@@ -16,6 +16,8 @@ use smol::net::TcpStream;
 use crate::{agent::GuiAgent, hello::HelloWorld};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
+
+const CREATURE_INSTANCE_SCENE: &str = "res://creature_instance.tscn";
 
 pub(crate) fn run(node: Ref<Node>) -> Result<()> {
     smol::block_on(async {
@@ -40,9 +42,9 @@ async fn handle_connection(mut connection: Connection, node: Ref<Node>) -> Resul
         &[Variant::from_str("I'm the message you received.")],
     );
 
-    let box_template = load_scene("res://Box.tscn").unwrap();
+    let box_template = load_scene(CREATURE_INSTANCE_SCENE).unwrap();
 
-    let instance = instance_scene::<Node>(&box_template);
+    let instance = instance_scene::<Spatial>(&box_template);
 
     node.add_child(instance.into_shared(), false);
 
