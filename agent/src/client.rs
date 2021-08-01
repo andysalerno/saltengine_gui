@@ -17,13 +17,11 @@ use server::{
 };
 use smol::net::TcpStream;
 
-use crate::{agent::GuiAgent, hello::HelloWorld};
+use crate::{agent::GuiAgent, gui_message::GuiMessage, hello::HelloWorld};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
-const CREATURE_INSTANCE_SCENE: &str = "res://card/creature_instance.tscn";
-
-pub(crate) fn run(sender: Sender<String>) -> Result<()> {
+pub(crate) fn run(sender: Sender<GuiMessage>) -> Result<()> {
     smol::block_on(async {
         info!("Connecting to localhost:9000.");
         let stream = TcpStream::connect("localhost:9000").await?;
@@ -36,11 +34,7 @@ pub(crate) fn run(sender: Sender<String>) -> Result<()> {
     })
 }
 
-async fn handle_connection(
-    mut connection: Connection,
-    // node: Ref<Node>,
-    sender: Sender<String>,
-) -> Result<()> {
+async fn handle_connection(mut connection: Connection, sender: Sender<GuiMessage>) -> Result<()> {
     // Expect a Hello
     info!("Connected.");
 
@@ -138,48 +132,4 @@ async fn handle_turn_start(connection: &mut Connection, agent: &dyn GameAgent) -
             _ => panic!("Unexpected message from server: {:?}", msg),
         }
     }
-}
-
-pub(crate) struct NodeManager {
-    root: Ref<Node>,
-}
-
-impl NodeManager {
-    pub fn new(root: Ref<Node>) -> Self {
-        Self { root }
-    }
-
-    pub fn spawn_card_instance(&self, card_view: &UnitCardInstancePlayerView) {
-        let creature_instance = load_scene(CREATURE_INSTANCE_SCENE).unwrap();
-        let creature_instance = instance_scene::<Spatial>(&creature_instance);
-
-        creature_instance.set("title", card_view.definition().title());
-        creature_instance.set("body", card_view.definition().text());
-
-        let temp_node = unsafe { self.root.assume_safe_if_sane().expect("root node not sane") };
-        temp_node.add_child(creature_instance.into_shared(), false);
-    }
-}
-
-pub fn load_scene(path: &str) -> Option<Ref<PackedScene, ThreadLocal>> {
-    let scene = ResourceLoader::godot_singleton().load(path, "PackedScene", false)?;
-
-    let scene = unsafe { scene.assume_thread_local() };
-
-    scene.cast::<PackedScene>()
-}
-
-/// Root here is needs to be the same type (or a parent type) of the node that you put in the child
-///   scene as the root. For instance Spatial is used for this example.
-fn instance_scene<TRoot>(scene: &PackedScene) -> Ref<TRoot, Unique>
-where
-    TRoot: gdnative::GodotObject<RefKind = ManuallyManaged> + SubClass<Node>,
-{
-    let instance = scene
-        .instance(PackedScene::GEN_EDIT_STATE_DISABLED)
-        .unwrap();
-
-    let instance = unsafe { instance.assume_unique() };
-
-    instance.try_cast::<TRoot>().unwrap()
 }
