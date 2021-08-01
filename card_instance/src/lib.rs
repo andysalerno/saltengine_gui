@@ -1,10 +1,5 @@
-use gdnative::api::{InputEventMouseButton, InputEventMouseMotion};
-use gdnative::core_types::vector3;
+use gdnative::api::{Camera, InputEventMouseButton, InputEventMouseMotion};
 use gdnative::prelude::*;
-use gdnative::{
-    nativescript::property::{EnumHint, IntHint, StringHint},
-    prelude::*,
-};
 use godot_log::GodotLog;
 use log::info;
 
@@ -17,6 +12,8 @@ fn init(handle: InitHandle) {
 godot_init!(init);
 
 const CLICK_RAISE_DIST: f32 = 10.;
+const BODY_TEXT_LABEL: &str = "CardBodyText/Viewport/GUI/Panel/RichTextLabel";
+const TITLE_TEXT_LABEL: &str = "CardTitleText/Viewport/GUI/Panel/RichTextLabel";
 
 #[derive(NativeClass)]
 #[register_with(Self::register)]
@@ -37,18 +34,14 @@ impl CardInstance {
     }
 
     fn follow_mouse_start(&mut self, owner: &Spatial) {
-        info!("mouse pressed on card");
         self.state_is_following_mouse = true;
 
         let translation = Vector3::new(0., 0., CLICK_RAISE_DIST / 100.);
         owner.translate(translation);
-
-        info!("{} started following mouse info", owner.name());
     }
 
     fn follow_mouse_stop(&mut self, owner: &Spatial) {
         self.state_is_following_mouse = false;
-        info!("mouse not pressed on card? - info");
 
         let translation = Vector3::new(0., 0., -CLICK_RAISE_DIST / 100.);
         owner.translate(translation);
@@ -60,11 +53,11 @@ impl CardInstance {
     #[export]
     fn _ready(&self, owner: TRef<Spatial>) {
         let _body_text = owner
-            .get_node("CardBodyText/Viewport/GUI/Panel/RichTextLabel")
+            .get_node(BODY_TEXT_LABEL)
             .expect("Did not find body text.");
 
         let _title_text = owner
-            .get_node("CardTitleText/Viewport/GUI/Panel/RichTextLabel")
+            .get_node(TITLE_TEXT_LABEL)
             .expect("Did not find title text.");
 
         unsafe {
@@ -98,20 +91,20 @@ impl CardInstance {
         owner: TRef<Spatial>,
         _camera: Variant,
         mouse_event: Variant,
-        _click_pos: Variant,
+
+        // Clicked position in world-space.
+        click_pos: Variant,
         _click_normal: Variant,
         _shape_idx: Variant,
     ) {
-        if let Some(event) = mouse_event.try_to_object::<InputEventMouseMotion>() {
+        if let Some(_event) = mouse_event.try_to_object::<InputEventMouseMotion>() {
             if self.state_is_following_mouse {
-                let motion = unsafe { event.assume_safe() };
-                let relative = motion.relative();
+                let click_pos = click_pos.try_to_vector3().unwrap();
 
-                info!("Saw motion: {:?}", relative);
+                let original_pos = owner.translation();
+                let next_pos = Vector3::new(click_pos.x, click_pos.y, original_pos.z);
 
-                let relative_three = Vector3::new(relative.x / 100., -relative.y / 100., 0.);
-
-                owner.translate(relative_three);
+                owner.set_translation(next_pos);
             }
         } else if let Some(event) = mouse_event.try_to_object::<InputEventMouseButton>() {
             let click = unsafe { event.assume_safe() };
