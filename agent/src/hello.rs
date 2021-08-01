@@ -1,3 +1,6 @@
+use std::thread::JoinHandle;
+
+use crossbeam::channel::{unbounded, Receiver, Sender, TryRecvError};
 use gdnative::{
     nativescript::property::{EnumHint, IntHint, StringHint},
     prelude::*,
@@ -9,32 +12,46 @@ use crate::{client, godot_log::GodotLog};
 #[derive(NativeClass)]
 #[register_with(Self::register)]
 #[inherit(Node)]
-pub struct HelloWorld;
+pub struct HelloWorld {
+    recv: Receiver<String>,
+    network_thread: JoinHandle<()>,
+}
 
 impl HelloWorld {
     fn new(_owner: &Node) -> Self {
-        Self
+        let (s, r) = unbounded();
+
+        let handle = std::thread::spawn(move || {
+            client::run(s).unwrap();
+        });
+
+        info!("Websocket server started on a new thread.");
+
+        Self {
+            recv: r,
+            network_thread: handle,
+        }
     }
 }
 
 #[methods]
 impl HelloWorld {
     #[export]
-    fn _ready(&self, owner: TRef<Node>) {
+    fn _ready(&self, _owner: TRef<Node>) {
         GodotLog::init();
-
-        let shared = unsafe { owner.assume_shared() };
-
-        std::thread::spawn(move || {
-            client::run(shared).unwrap();
-        });
-
-        info!("Websocket server started on a new thread.");
-        // client::run(owner).unwrap();
     }
 
     #[export]
-    fn my_method(&self, _owner: &Node) {
+    fn _process(&self, _owner: TRef<Node>, _delta: f64) {
+        match self.recv.try_recv() {
+            Ok(msg) => godot_print!("Saw message: {}", msg),
+            Err(TryRecvError::Disconnected) => godot_print!("Disconnected"),
+            _ => {}
+        }
+    }
+
+    #[export]
+    fn my_method(&self, _owner: TRef<Node>) {
         info!("Invoked my_method.");
     }
 

@@ -1,3 +1,4 @@
+use crossbeam::channel::{unbounded, Receiver, Sender};
 use gdnative::{
     api::{Node, PackedScene, ResourceLoader, Spatial},
     core_types::{ToVariant, Variant, Vector3},
@@ -22,7 +23,7 @@ type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>
 
 const CREATURE_INSTANCE_SCENE: &str = "res://card/creature_instance.tscn";
 
-pub(crate) fn run(node: Ref<Node>) -> Result<()> {
+pub(crate) fn run(sender: Sender<String>) -> Result<()> {
     smol::block_on(async {
         info!("Connecting to localhost:9000.");
         let stream = TcpStream::connect("localhost:9000").await?;
@@ -31,19 +32,17 @@ pub(crate) fn run(node: Ref<Node>) -> Result<()> {
 
         let connection = Connection::new(connection);
 
-        handle_connection(connection, node).await
+        handle_connection(connection, sender).await
     })
 }
 
-async fn handle_connection(mut connection: Connection, node: Ref<Node>) -> Result<()> {
+async fn handle_connection(
+    mut connection: Connection,
+    // node: Ref<Node>,
+    sender: Sender<String>,
+) -> Result<()> {
     // Expect a Hello
     info!("Connected.");
-
-    let temp_node = unsafe { node.assume_safe() };
-    temp_node.emit_signal(
-        "ws_message_received",
-        &[Variant::from_str("I'm the message you received.")],
-    );
 
     info!("Waiting for server to send my ID...");
     let my_id = match connection.recv::<FromServer>().await {
@@ -53,8 +52,7 @@ async fn handle_connection(mut connection: Connection, node: Ref<Node>) -> Resul
 
     info!("Received my ID: {:?}", my_id);
 
-    let mut agent: Box<dyn GameAgent> =
-        Box::new(GuiAgent::new_with_id(NodeManager::new(node), my_id));
+    let mut agent: Box<dyn GameAgent> = Box::new(GuiAgent::new_with_id(sender, my_id));
 
     // Send Ready
     info!("Sending ready message....");

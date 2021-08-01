@@ -1,3 +1,4 @@
+use crossbeam::channel::Sender;
 use gdnative::{api::Node, Ref};
 use salt_engine::{
     game_agent::game_agent::GameAgent,
@@ -5,16 +6,14 @@ use salt_engine::{
     game_state::{board::BoardView, IterAddons, PlayerId},
 };
 
-use crate::client::NodeManager;
-
 pub(crate) struct GuiAgent {
     player_id: PlayerId,
-    manager: NodeManager,
+    sender: Sender<String>,
 }
 
 impl GuiAgent {
-    pub fn new_with_id(manager: NodeManager, player_id: PlayerId) -> Self {
-        Self { manager, player_id }
+    pub fn new_with_id(sender: Sender<String>, player_id: PlayerId) -> Self {
+        Self { sender, player_id }
     }
 }
 
@@ -37,7 +36,8 @@ impl GameAgent for GuiAgent {
     fn observe_state_update(&self, _game_state: salt_engine::game_state::GameStatePlayerView) {
         for creature_slot in _game_state.board().slots_iter().with_creature() {
             let creature = creature_slot.maybe_creature().unwrap();
-            self.manager.spawn_card_instance(creature);
+            // self.manager.spawn_card_instance(creature);
+            self.sender.send("message from the agent".to_string());
         }
     }
 }
