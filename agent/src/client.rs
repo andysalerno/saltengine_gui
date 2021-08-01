@@ -1,6 +1,6 @@
 use gdnative::{
     api::{Node, PackedScene, ResourceLoader, Spatial},
-    core_types::{Variant, Vector3},
+    core_types::{ToVariant, Variant, Vector3},
     object::SubClass,
     prelude::{ManuallyManaged, ThreadLocal, Unique},
     Ref, TRef,
@@ -17,7 +17,7 @@ use crate::{agent::GuiAgent, hello::HelloWorld};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
-const CREATURE_INSTANCE_SCENE: &str = "res://creature_instance.tscn";
+const CREATURE_INSTANCE_SCENE: &str = "res://card/creature_instance.tscn";
 
 pub(crate) fn run(node: Ref<Node>) -> Result<()> {
     smol::block_on(async {
@@ -42,11 +42,15 @@ async fn handle_connection(mut connection: Connection, node: Ref<Node>) -> Resul
         &[Variant::from_str("I'm the message you received.")],
     );
 
-    let box_template = load_scene(CREATURE_INSTANCE_SCENE).unwrap();
+    let creature_instance = load_scene(CREATURE_INSTANCE_SCENE).unwrap();
+    let creature_instance = instance_scene::<Spatial>(&creature_instance);
 
-    let instance = instance_scene::<Spatial>(&box_template);
+    unsafe {
+        creature_instance.call("set_body_text", &["body from rust!".to_variant()]);
+        creature_instance.call("set_title_text", &["title from rust!".to_variant()]);
+    }
 
-    node.add_child(instance.into_shared(), false);
+    node.add_child(creature_instance.into_shared(), false);
 
     info!("Waiting for server to send my ID...");
     let my_id = match connection.recv::<FromServer>().await {
@@ -65,7 +69,7 @@ async fn handle_connection(mut connection: Connection, node: Ref<Node>) -> Resul
 
     // Expect a GameStart
     info!("Waiting for GameStart message.");
-    let opponent_id = match connection.recv::<FromServer>().await {
+    let _opponent_id = match connection.recv::<FromServer>().await {
         Some(FromServer::GameStart { opponent_id }) => opponent_id,
         other => panic!("unexpected response from server: {:?}", other),
     };
@@ -73,7 +77,7 @@ async fn handle_connection(mut connection: Connection, node: Ref<Node>) -> Resul
 
     // Expect the game state
     info!("Waiting for GameStateView.");
-    let gamestate_view = match connection.recv::<FromServer>().await {
+    let _gamestate_view = match connection.recv::<FromServer>().await {
         Some(FromServer::State(view)) => view,
         _ => panic!("unexpected response from server"),
     };
