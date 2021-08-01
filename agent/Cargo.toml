@@ -12,6 +12,7 @@ edition = "2018"
 gdnative = "0.9"
 salt_engine = { path = "C:/Users/andys/repos/SaltEngine/engine" }
 server = { path = "C:/Users/andys/repos/SaltEngine/server" }
+godot_log = { path = "../godot_log" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 async-tungstenite = { version = "0.13", features = ["async-std-runtime"] }

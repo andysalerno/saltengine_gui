@@ -2,5 +2,6 @@
 
 members = [
 	"agent",
-	"card_instance"
+	"card_instance",
+	"godot_log"
 ]

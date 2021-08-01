@@ -5,13 +5,14 @@ use gdnative::{
     nativescript::property::{EnumHint, IntHint, StringHint},
     prelude::*,
 };
+use godot_log::GodotLog;
 use log::info;
 use salt_engine::{
     cards::UnitCardDefinitionView,
     game_state::{board::BoardView, GameStatePlayerView, IterAddons, UnitCardInstancePlayerView},
 };
 
-use crate::{client, godot_log::GodotLog, gui_message::GuiMessage};
+use crate::{client, gui_message::GuiMessage};
 
 const CREATURE_INSTANCE_SCENE: &str = "res://card/creature_instance.tscn";
 

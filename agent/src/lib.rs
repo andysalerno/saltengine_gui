@@ -1,6 +1,6 @@
 mod agent;
 mod client;
-mod godot_log;
+// mod godot_log;
 mod gui_message;
 mod hello;
 
