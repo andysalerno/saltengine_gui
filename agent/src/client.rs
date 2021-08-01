@@ -6,7 +6,10 @@ use gdnative::{
     Ref, TRef,
 };
 use log::{info, warn};
-use salt_engine::game_agent::game_agent::GameAgent;
+use salt_engine::{
+    cards::UnitCardDefinitionView, game_agent::game_agent::GameAgent,
+    game_state::UnitCardInstancePlayerView,
+};
 use server::{
     connection::Connection,
     messages::{FromClient, FromServer, PromptMessage},
@@ -36,21 +39,11 @@ async fn handle_connection(mut connection: Connection, node: Ref<Node>) -> Resul
     // Expect a Hello
     info!("Connected.");
 
-    let node = unsafe { node.assume_safe() };
-    node.emit_signal(
+    let temp_node = unsafe { node.assume_safe() };
+    temp_node.emit_signal(
         "ws_message_received",
         &[Variant::from_str("I'm the message you received.")],
     );
-
-    let creature_instance = load_scene(CREATURE_INSTANCE_SCENE).unwrap();
-    let creature_instance = instance_scene::<Spatial>(&creature_instance);
-
-    unsafe {
-        creature_instance.call("set_body_text", &["body from rust!".to_variant()]);
-        creature_instance.call("set_title_text", &["title from rust!".to_variant()]);
-    }
-
-    node.add_child(creature_instance.into_shared(), false);
 
     info!("Waiting for server to send my ID...");
     let my_id = match connection.recv::<FromServer>().await {
@@ -60,7 +53,8 @@ async fn handle_connection(mut connection: Connection, node: Ref<Node>) -> Resul
 
     info!("Received my ID: {:?}", my_id);
 
-    let mut agent: Box<dyn GameAgent> = Box::new(GuiAgent::new_with_id(my_id));
+    let mut agent: Box<dyn GameAgent> =
+        Box::new(GuiAgent::new_with_id(NodeManager::new(node), my_id));
 
     // Send Ready
     info!("Sending ready message....");
@@ -145,6 +139,27 @@ async fn handle_turn_start(connection: &mut Connection, agent: &dyn GameAgent) -
             FromServer::State(state) => agent.observe_state_update(state),
             _ => panic!("Unexpected message from server: {:?}", msg),
         }
+    }
+}
+
+pub(crate) struct NodeManager {
+    root: Ref<Node>,
+}
+
+impl NodeManager {
+    pub fn new(root: Ref<Node>) -> Self {
+        Self { root }
+    }
+
+    pub fn spawn_card_instance(&self, card_view: &UnitCardInstancePlayerView) {
+        let creature_instance = load_scene(CREATURE_INSTANCE_SCENE).unwrap();
+        let creature_instance = instance_scene::<Spatial>(&creature_instance);
+
+        creature_instance.set("title", card_view.definition().title());
+        creature_instance.set("body", card_view.definition().text());
+
+        let temp_node = unsafe { self.root.assume_safe_if_sane().expect("root node not sane") };
+        temp_node.add_child(creature_instance.into_shared(), false);
     }
 }
 

@@ -1,5 +1,6 @@
 [workspace]
 
 members = [
-	"agent"
+	"agent",
+	"card_instance"
 ]
