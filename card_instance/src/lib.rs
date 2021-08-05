@@ -85,19 +85,30 @@ impl CardInstance {
             .expect("failed to connect signal");
     }
 
-    // #[export]
-    // fn _process(&self, owner: TRef<Spatial>) {
-    //     info!("process");
+    #[export]
+    fn _physics_process(&mut self, owner: TRef<Spatial>, _delta: f32) {
+        if self.state_is_following_mouse {
+            let tree = owner.get_tree().unwrap();
+            let tree = unsafe { tree.assume_safe() };
+            let root = tree.root().unwrap();
+            let root = unsafe { root.assume_safe() };
 
-    //     if self.state_is_following_mouse {
-    //         let tree = owner.get_tree().unwrap();
-    //         let tree = unsafe { tree.assume_safe() };
-    //         let root = tree.root().unwrap();
-    //         let root = unsafe { root.assume_safe() };
-    //         root.get_mouse_position();
-    //         //let mouse_pos = owner.get_tree().
-    //     }
-    // }
+            let camera = root.get_camera().unwrap();
+            let camera = unsafe { camera.assume_safe() };
+
+            let mouse_pos = root.get_mouse_position();
+            let original_global_pos = owner.global_transform().origin;
+            let card_z = original_global_pos.z;
+
+            let updated_pos = camera.project_position(mouse_pos, f32::abs(card_z) as f64);
+
+            let mut current = owner.global_transform();
+            current.origin.x = updated_pos.x;
+            current.origin.y = updated_pos.y;
+
+            owner.set_global_transform(current);
+        }
+    }
 
     #[export]
     fn input_event(
@@ -132,29 +143,31 @@ impl CardInstance {
 
                 //     owner.set_translation(next_local);
                 // }
-                {
-                    let click_pos = click_pos.try_to_vector3().unwrap();
-                    info!("-- click pos: {:?}", click_pos);
+                // {
+                //     let click_pos = click_pos.try_to_vector3().unwrap();
+                //     info!("-- click pos: {:?}", click_pos);
 
-                    let original_pos = owner.translation();
-                    let original_global = owner.to_global(original_pos);
+                //     let original_pos = owner.translation();
+                //     let original_global = owner.to_global(original_pos);
 
-                    info!("original local: {:?}", original_pos);
-                    info!("original global: {:?}", original_global);
+                //     info!("original local: {:?}", original_pos);
+                //     info!("original global: {:?}", original_global);
 
-                    let next_local = Vector3::new(click_pos.x, click_pos.y, original_pos.z);
-                    info!("next local: {:?}", next_local);
+                //     let next_local = Vector3::new(click_pos.x, click_pos.y, original_pos.z);
+                //     info!("next local: {:?}", next_local);
 
-                    let mut diff = click_pos - original_global;
-                    diff.z = 0.;
-                    owner.global_translate(diff);
-                }
+                //     let mut diff = click_pos - original_global;
+                //     diff.z = 0.;
+                //     owner.global_translate(diff);
+                // }
             }
         } else if let Some(event) = mouse_event.try_to_object::<InputEventMouseButton>() {
             let click = unsafe { event.assume_safe() };
             if click.is_pressed() {
+                // info!("start following");
                 self.follow_mouse_start(&owner);
             } else {
+                // info!("stop following");
                 self.follow_mouse_stop(&owner);
             }
         }

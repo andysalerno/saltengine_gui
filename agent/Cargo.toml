@@ -10,8 +10,8 @@ edition = "2018"
 
 [dependencies]
 gdnative = "0.9"
-salt_engine = { path = "C:/Users/andys/repos/SaltEngine/engine" }
-server = { path = "C:/Users/andys/repos/SaltEngine/server" }
+salt_engine = { path = "../../SaltEngine/engine" }
+server = { path = "../../SaltEngine/server" }
 godot_log = { path = "../godot_log" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
