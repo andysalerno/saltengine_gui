@@ -3,5 +3,6 @@
 members = [
 	"agent",
 	"card_instance",
+	"hand",
 	"godot_log"
 ]
