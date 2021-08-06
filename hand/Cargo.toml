@@ -12,4 +12,3 @@ edition = "2018"
 gdnative = "0.9"
 log = "0.4"
 godot_log = { path = "../godot_log" }
-card_instance = { path = "../card_instance" }

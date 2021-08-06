@@ -1,4 +1,3 @@
-use card_instance::CardInstance;
 use gdnative::prelude::*;
 use godot_log::GodotLog;
 
@@ -58,7 +57,7 @@ impl Hand {
     }
 
     #[export]
-    fn add_card(&mut self, owner: TRef<Spatial>, card: CardInstance) {}
+    fn add_card(&mut self, owner: TRef<Spatial>) {}
 
     fn register(builder: &ClassBuilder<Self>) {
         builder
