@@ -57,7 +57,7 @@ impl Hand {
     }
 
     #[export]
-    fn add_card(&mut self, owner: TRef<Spatial>) {}
+    fn add_card(&mut self, _owner: TRef<Spatial>) {}
 
     fn register(builder: &ClassBuilder<Self>) {
         builder

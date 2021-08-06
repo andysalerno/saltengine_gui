@@ -1,6 +1,6 @@
 use std::thread::JoinHandle;
 
-use crossbeam::channel::{unbounded, Receiver, Sender, TryRecvError};
+use crossbeam::channel::{unbounded, Receiver, TryRecvError};
 use gdnative::{
     nativescript::property::{EnumHint, IntHint, StringHint},
     prelude::*,

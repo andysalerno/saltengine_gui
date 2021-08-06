@@ -31,11 +31,11 @@ impl CardInstance {
         }
     }
 
-    fn follow_mouse_start(&mut self, owner: &Spatial) {
+    fn follow_mouse_start(&mut self, _owner: &Spatial) {
         self.state_is_following_mouse = true;
     }
 
-    fn follow_mouse_stop(&mut self, owner: &Spatial) {
+    fn follow_mouse_stop(&mut self, _owner: &Spatial) {
         self.state_is_following_mouse = false;
     }
 

@@ -2,7 +2,7 @@ use crossbeam::channel::Sender;
 use salt_engine::{
     game_agent::game_agent::GameAgent,
     game_logic::{ClientGameEvent, EndTurnEvent},
-    game_state::{board::BoardView, IterAddons, PlayerId},
+    game_state::PlayerId,
 };
 
 use crate::gui_message::GuiMessage;
@@ -21,7 +21,7 @@ impl GuiAgent {
 impl GameAgent for GuiAgent {
     fn get_action(
         &self,
-        game_state: &salt_engine::game_state::GameStatePlayerView,
+        _game_state: &salt_engine::game_state::GameStatePlayerView,
     ) -> salt_engine::game_logic::ClientGameEvent {
         ClientGameEvent::EndTurn(EndTurnEvent)
     }

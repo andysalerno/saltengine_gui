@@ -1,12 +1,6 @@
-use crossbeam::channel::{unbounded, Receiver, Sender};
-use gdnative::{
-    api::{Node, PackedScene, ResourceLoader, Spatial},
-    core_types::{ToVariant, Variant, Vector3},
-    object::SubClass,
-    prelude::{ManuallyManaged, ThreadLocal, Unique},
-    Ref, TRef,
-};
-use log::{info, warn};
+use crossbeam::channel::Sender;
+
+use log::info;
 use salt_engine::{
     cards::UnitCardDefinitionView, game_agent::game_agent::GameAgent,
     game_state::UnitCardInstancePlayerView,
@@ -17,7 +11,7 @@ use server::{
 };
 use smol::net::TcpStream;
 
-use crate::{agent::GuiAgent, gui_message::GuiMessage, hello::HelloWorld};
+use crate::{agent::GuiAgent, gui_message::GuiMessage};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
