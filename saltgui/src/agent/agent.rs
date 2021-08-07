@@ -5,7 +5,7 @@ use salt_engine::{
     game_state::PlayerId,
 };
 
-use crate::gui_message::GuiMessage;
+use super::gui_message::GuiMessage;
 
 pub(crate) struct GuiAgent {
     player_id: PlayerId,

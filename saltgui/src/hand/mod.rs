@@ -1,14 +1,6 @@
 use gdnative::prelude::*;
 use godot_log::GodotLog;
 
-// Function that registers all exposed classes to Godot
-fn init(handle: InitHandle) {
-    GodotLog::init();
-    handle.add_class::<Hand>();
-}
-// Macro that creates the entry-points of the dynamic library.
-godot_init!(init);
-
 const BODY_TEXT_LABEL: &str = "CardBodyText/Viewport/GUI/Panel/RichTextLabel";
 const TITLE_TEXT_LABEL: &str = "CardTitleText/Viewport/GUI/Panel/RichTextLabel";
 

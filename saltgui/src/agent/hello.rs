@@ -1,5 +1,5 @@
-use std::thread::JoinHandle;
-
+use super::gui_message::GuiMessage;
+use crate::agent::client;
 use crossbeam::channel::{unbounded, Receiver, TryRecvError};
 use gdnative::{
     nativescript::property::{EnumHint, IntHint, StringHint},
@@ -11,8 +11,7 @@ use salt_engine::{
     cards::UnitCardDefinitionView,
     game_state::{board::BoardView, GameStatePlayerView, IterAddons, UnitCardInstancePlayerView},
 };
-
-use crate::{client, gui_message::GuiMessage};
+use std::thread::JoinHandle;
 
 const CREATURE_INSTANCE_SCENE: &str = "res://card/creature_instance.tscn";
 

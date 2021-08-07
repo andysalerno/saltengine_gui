@@ -1,8 +1,6 @@
 [workspace]
 
 members = [
-	"agent",
-	"card_instance",
-	"hand",
-	"godot_log"
+	"godot_log",
+	"saltgui"
 ]

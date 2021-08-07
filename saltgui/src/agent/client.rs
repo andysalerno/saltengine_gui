@@ -11,7 +11,9 @@ use server::{
 };
 use smol::net::TcpStream;
 
-use crate::{agent::GuiAgent, gui_message::GuiMessage};
+use crate::agent::agent::GuiAgent;
+
+use super::gui_message::GuiMessage;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
