@@ -1,7 +1,11 @@
 use gdnative::api::InputEventMouseButton;
 use gdnative::prelude::*;
+use gdnative::thread_access::ThreadAccess;
 use godot_log::GodotLog;
 
+use crate::util;
+
+const CARD_INSTANCE_SCENE: &str = "res://card/creature_instance.tscn";
 const BODY_TEXT_LABEL: &str = "CardBodyText/Viewport/GUI/Panel/RichTextLabel";
 const TITLE_TEXT_LABEL: &str = "CardTitleText/Viewport/GUI/Panel/RichTextLabel";
 
@@ -15,12 +19,20 @@ pub struct CardInstance {
 }
 
 impl CardInstance {
-    fn new(_owner: &Spatial) -> Self {
+    pub(crate) fn new(_owner: &Spatial) -> Self {
         Self {
             title: "unset".to_string(),
             body: "unset".to_string(),
             state_is_following_mouse: false,
         }
+    }
+
+    pub fn set_title(&mut self, title: impl ToString) {
+        self.title = title.to_string();
+    }
+
+    pub fn set_body(&mut self, body: impl ToString) {
+        self.body = body.to_string();
     }
 
     fn follow_mouse_start(&mut self, _owner: &Spatial) {
@@ -51,6 +63,15 @@ impl CardInstance {
         current.origin.y = updated_pos.y;
 
         owner.set_global_transform(current);
+    }
+
+    // pub(crate) fn new_instance() -> Ref<Spatial, Unique> {
+    pub(crate) fn new_instance() -> Instance<CardInstance, Unique> {
+        let card_instance = util::load_scene(CARD_INSTANCE_SCENE).unwrap();
+        let card_instance = util::instance_scene::<Spatial>(&card_instance);
+        let card_instance = card_instance.cast_instance::<CardInstance>().unwrap();
+
+        card_instance
     }
 }
 

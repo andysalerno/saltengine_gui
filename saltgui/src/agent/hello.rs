@@ -1,5 +1,10 @@
 use super::gui_message::GuiMessage;
-use crate::agent::client;
+use crate::{
+    agent::client,
+    card_instance::CardInstance,
+    hand::{Hand, HandRef},
+    util,
+};
 use crossbeam::channel::{unbounded, Receiver, TryRecvError};
 use gdnative::{
     nativescript::property::{EnumHint, IntHint, StringHint},
@@ -9,11 +14,15 @@ use godot_log::GodotLog;
 use log::info;
 use salt_engine::{
     cards::UnitCardDefinitionView,
-    game_state::{board::BoardView, GameStatePlayerView, IterAddons, UnitCardInstancePlayerView},
+    game_state::{
+        board::BoardView, GameStatePlayerView, GameStateView, HandView, IterAddons,
+        UnitCardInstancePlayerView,
+    },
 };
 use std::thread::JoinHandle;
 
 const CREATURE_INSTANCE_SCENE: &str = "res://card/creature_instance.tscn";
+const PLAYER_HAND_NAME: &str = "PlayerHand";
 
 #[derive(NativeClass)]
 #[register_with(Self::register)]
@@ -40,48 +49,29 @@ impl HelloWorld {
     }
 
     fn update_from_state(&self, state: GameStatePlayerView, owner: TRef<Node>) {
-        //owner.get_
-        //TRef::fr
-        for creature in state.board().slots_iter().exclude_heroes().creatures() {
-            self.add_card_instance(creature, owner);
+        info!("Updating from state.");
+        let hand_ref = owner.get_node(PLAYER_HAND_NAME).unwrap();
+        let hand_ref = unsafe { hand_ref.assume_safe() };
+        let hand_ref = hand_ref.cast::<Spatial>().unwrap();
+        let mut hand_ref = HandRef::new(hand_ref);
+        for hand_card in state.hand().cards() {
+            info!("iterating over hand_card...");
+            hand_ref.add_card(hand_card);
         }
-        // for creature in state.board().slots_iter().exclude_heroes().with_creature() {}
     }
 
     fn add_card_instance(&self, card_view: &UnitCardInstancePlayerView, owner: TRef<Node>) {
-        let creature_instance = Self::load_scene(CREATURE_INSTANCE_SCENE).unwrap();
-        let creature_instance = Self::instance_scene::<Spatial>(&creature_instance);
+        let creature_instance = util::load_scene(CREATURE_INSTANCE_SCENE).unwrap();
+        let creature_instance = util::instance_scene::<Spatial>(&creature_instance);
 
         creature_instance.set("title", card_view.definition().title());
         creature_instance.set("body", card_view.definition().text());
-        // creature_instance.set_name("testingtesting");
 
-        // let temp_node = unsafe { owner.assume_safe_if_sane().expect("root node not sane") };
-        //temp_node.add_child(creature_instance.into_shared(), false);
+        let mut current_translation = creature_instance.translation();
+        current_translation.z = -4.5;
+        creature_instance.set_translation(current_translation);
+
         owner.add_child(creature_instance, false);
-    }
-
-    fn load_scene(path: &str) -> Option<Ref<PackedScene, ThreadLocal>> {
-        let scene = ResourceLoader::godot_singleton().load(path, "PackedScene", false)?;
-
-        let scene = unsafe { scene.assume_thread_local() };
-
-        scene.cast::<PackedScene>()
-    }
-
-    /// Root here is needs to be the same type (or a parent type) of the node that you put in the child
-    ///   scene as the root. For instance Spatial is used for this example.
-    fn instance_scene<TRoot>(scene: &PackedScene) -> Ref<TRoot, Unique>
-    where
-        TRoot: gdnative::GodotObject<RefKind = ManuallyManaged> + SubClass<Node>,
-    {
-        let instance = scene
-            .instance(PackedScene::GEN_EDIT_STATE_DISABLED)
-            .unwrap();
-
-        let instance = unsafe { instance.assume_unique() };
-
-        instance.try_cast::<TRoot>().unwrap()
     }
 }
 

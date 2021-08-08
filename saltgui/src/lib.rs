@@ -1,6 +1,7 @@
 mod agent;
 mod card_instance;
 mod hand;
+mod util;
 
 use agent::hello::HelloWorld;
 use card_instance::CardInstance;
