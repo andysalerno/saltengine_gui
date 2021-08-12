@@ -1,13 +1,15 @@
 use gdnative::prelude::*;
 use godot_log::GodotLog;
 use log::info;
-use salt_engine::game_state::UnitCardInstancePlayerView;
+use salt_engine::{cards::UnitCardDefinitionView, game_state::UnitCardInstancePlayerView};
 
 use crate::{card_instance::CardInstance, util};
 
 const CARD_INSTANCE_SCENE: &str = "res://card/creature_instance.tscn";
 const BODY_TEXT_LABEL: &str = "CardBodyText/Viewport/GUI/Panel/RichTextLabel";
 const TITLE_TEXT_LABEL: &str = "CardTitleText/Viewport/GUI/Panel/RichTextLabel";
+
+const OFFSET_DIST_MULTIPLIER: f32 = 1.75;
 
 #[derive(NativeClass)]
 #[register_with(Self::register)]
@@ -57,15 +59,33 @@ impl<'a> HandRef<'a> {
         let card_instance = card_instance.into_shared();
         let card_instance = unsafe { card_instance.assume_safe() };
 
-        let hand = self.node.cast_instance::<Hand>().unwrap();
-        let offset = hand.map(|n, _| n.hand_len).unwrap();
+        card_instance.set("title", card.definition().title());
+        card_instance.set("body", card.definition().text());
 
-        card_instance.translate(Vector3::new(offset as f32, 0., 0.));
+        let hand = self.node.cast_instance::<Hand>().unwrap();
+        let offset = hand.map(|n, _| n.hand_len).unwrap() as f32 * OFFSET_DIST_MULTIPLIER;
+
+        card_instance.translate(Vector3::new(offset, 0., 0.));
 
         hand.map_mut(|hand, _| hand.hand_len += 1).unwrap();
 
+        info!(
+            "Transform before: {:?}, translation before: {:?}",
+            self.node.transform(),
+            self.node.translation()
+        );
         self.node.add_child(card_instance, false);
+        info!(
+            "Transform after: {:?}, translation before: {:?}",
+            self.node.transform(),
+            self.node.translation()
+        );
 
         info!("Added child.");
     }
+
+    // fn center_hand(&self) {
+    //     let current_width = self.node.
+    //     let current_midpoint = self.node.translation().x;
+    // }
 }
