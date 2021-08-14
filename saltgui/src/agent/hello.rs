@@ -6,10 +6,7 @@ use crate::{
     util,
 };
 use crossbeam::channel::{unbounded, Receiver, TryRecvError};
-use gdnative::{
-    nativescript::property::{EnumHint, IntHint, StringHint},
-    prelude::*,
-};
+use gdnative::prelude::*;
 use godot_log::GodotLog;
 use log::info;
 use salt_engine::{

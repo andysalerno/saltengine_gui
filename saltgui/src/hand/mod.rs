@@ -1,9 +1,9 @@
 use gdnative::prelude::*;
-use godot_log::GodotLog;
+
 use log::info;
 use salt_engine::{cards::UnitCardDefinitionView, game_state::UnitCardInstancePlayerView};
 
-use crate::{card_instance::CardInstance, util};
+use crate::card_instance::CardInstance;
 
 const OFFSET_DIST_MULTIPLIER: f32 = 1.75;
 
@@ -23,7 +23,7 @@ impl Hand {
 #[methods]
 impl Hand {
     #[export]
-    fn _ready(&self, owner: TRef<Spatial>) {
+    fn _ready(&self, _owner: TRef<Spatial>) {
         info!("Hand is ready.");
     }
 
