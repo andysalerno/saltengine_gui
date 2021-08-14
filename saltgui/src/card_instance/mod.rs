@@ -1,7 +1,5 @@
 use gdnative::api::InputEventMouseButton;
 use gdnative::prelude::*;
-use gdnative::thread_access::ThreadAccess;
-use godot_log::GodotLog;
 
 use crate::util;
 
@@ -65,7 +63,6 @@ impl CardInstance {
         owner.set_global_transform(current);
     }
 
-    // pub(crate) fn new_instance() -> Ref<Spatial, Unique> {
     pub(crate) fn new_instance() -> Instance<CardInstance, Unique> {
         let card_instance = util::load_scene(CARD_INSTANCE_SCENE).unwrap();
         let card_instance = util::instance_scene::<Spatial>(&card_instance);

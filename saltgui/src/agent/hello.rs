@@ -101,26 +101,26 @@ impl HelloWorld {
     }
 
     fn register(builder: &ClassBuilder<Self>) {
-        builder
-            .add_property::<String>("test/test_enum")
-            .with_hint(StringHint::Enum(EnumHint::new(vec![
-                "Hello".into(),
-                "World".into(),
-                "Testing".into(),
-            ])))
-            .with_getter(|_: &HelloWorld, _| "Hello".to_string())
-            .done();
+        // builder
+        //     .add_property::<String>("test/test_enum")
+        //     .with_hint(StringHint::Enum(EnumHint::new(vec![
+        //         "Hello".into(),
+        //         "World".into(),
+        //         "Testing".into(),
+        //     ])))
+        //     .with_getter(|_: &HelloWorld, _| "Hello".to_string())
+        //     .done();
 
-        builder
-            .add_property("test/test_flags")
-            .with_hint(IntHint::Flags(EnumHint::new(vec![
-                "A".into(),
-                "B".into(),
-                "C".into(),
-                "D".into(),
-            ])))
-            .with_getter(|_: &HelloWorld, _| 0)
-            .done();
+        // builder
+        //     .add_property("test/test_flags")
+        //     .with_hint(IntHint::Flags(EnumHint::new(vec![
+        //         "A".into(),
+        //         "B".into(),
+        //         "C".into(),
+        //         "D".into(),
+        //     ])))
+        //     .with_getter(|_: &HelloWorld, _| 0)
+        //     .done();
 
         builder.add_signal(Signal {
             name: "ws_message_received",

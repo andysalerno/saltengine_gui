@@ -5,10 +5,6 @@ use salt_engine::{cards::UnitCardDefinitionView, game_state::UnitCardInstancePla
 
 use crate::{card_instance::CardInstance, util};
 
-const CARD_INSTANCE_SCENE: &str = "res://card/creature_instance.tscn";
-const BODY_TEXT_LABEL: &str = "CardBodyText/Viewport/GUI/Panel/RichTextLabel";
-const TITLE_TEXT_LABEL: &str = "CardTitleText/Viewport/GUI/Panel/RichTextLabel";
-
 const OFFSET_DIST_MULTIPLIER: f32 = 1.75;
 
 #[derive(NativeClass)]
@@ -40,6 +36,7 @@ impl Hand {
         builder
             .add_property::<i32>("hand_len")
             .with_getter(|s: &Self, _| s.hand_len)
+            .with_setter(|s, _, value| s.hand_len = value)
             .done();
     }
 }
