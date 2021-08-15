@@ -66,9 +66,7 @@ impl CardInstance {
     pub(crate) fn new_instance() -> Instance<CardInstance, Unique> {
         let card_instance = util::load_scene(CARD_INSTANCE_SCENE).unwrap();
         let card_instance = util::instance_scene::<Spatial>(&card_instance);
-        let card_instance = card_instance.cast_instance::<CardInstance>().unwrap();
-
-        card_instance
+        card_instance.cast_instance::<CardInstance>().unwrap()
     }
 }
 
@@ -76,21 +74,21 @@ impl CardInstance {
 impl CardInstance {
     #[export]
     fn _ready(&self, owner: TRef<Spatial>) {
-        let _body_text = owner
+        let body_text = owner
             .get_node(BODY_TEXT_LABEL)
             .expect("Did not find body text.");
 
-        let _title_text = owner
+        let title_text = owner
             .get_node(TITLE_TEXT_LABEL)
             .expect("Did not find title text.");
 
         unsafe {
-            _body_text
+            body_text
                 .assume_safe_if_sane()
                 .expect("_body_text was not sane")
                 .set("text", &self.body);
 
-            _title_text
+            title_text
                 .assume_safe_if_sane()
                 .expect("_title_text was not sane")
                 .set("text", &self.title);

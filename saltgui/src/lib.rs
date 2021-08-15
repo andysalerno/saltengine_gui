@@ -1,3 +1,6 @@
+#![deny(clippy::all, nonstandard_style, future_incompatible)]
+#![warn(clippy::pedantic)]
+#![allow(clippy::needless_pass_by_value)]
 mod agent;
 mod board_slot;
 mod card_instance;

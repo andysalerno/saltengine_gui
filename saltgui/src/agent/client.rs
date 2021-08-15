@@ -11,7 +11,7 @@ use server::{
 };
 use smol::net::TcpStream;
 
-use crate::agent::agent::GuiAgent;
+use crate::agent::gui_agent::GuiAgent;
 
 use super::gui_message::GuiMessage;
 
