@@ -1,13 +1,13 @@
 #![deny(clippy::all, nonstandard_style, future_incompatible)]
 #![warn(clippy::pedantic)]
-#![allow(clippy::needless_pass_by_value)]
+#![allow(clippy::needless_pass_by_value, clippy::unused_self)]
 mod agent;
 mod board_slot;
 mod card_instance;
 mod hand;
 mod util;
 
-use agent::hello::HelloWorld;
+use agent::world::World;
 use board_slot::BoardSlot;
 use card_instance::CardInstance;
 use gdnative::prelude::*;
@@ -17,7 +17,7 @@ use hand::Hand;
 fn init(handle: InitHandle) {
     GodotLog::init();
     handle.add_class::<CardInstance>();
-    handle.add_class::<HelloWorld>();
+    handle.add_class::<World>();
     handle.add_class::<Hand>();
     handle.add_class::<BoardSlot>();
 }

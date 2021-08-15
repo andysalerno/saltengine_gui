@@ -1,20 +1,12 @@
 use super::gui_message::GuiMessage;
-use crate::{
-    agent::client,
-    card_instance::CardInstance,
-    hand::{Hand, HandRef},
-    util,
-};
+use crate::{agent::client, hand::HandRef, util};
 use crossbeam::channel::{unbounded, Receiver, TryRecvError};
 use gdnative::prelude::*;
 use godot_log::GodotLog;
 use log::info;
 use salt_engine::{
     cards::UnitCardDefinitionView,
-    game_state::{
-        board::BoardView, GameStatePlayerView, GameStateView, HandView, IterAddons,
-        UnitCardInstancePlayerView,
-    },
+    game_state::{GameStatePlayerView, HandView, UnitCardInstancePlayerView},
 };
 use std::thread::JoinHandle;
 
@@ -24,12 +16,12 @@ const PLAYER_HAND_NAME: &str = "PlayerHand";
 #[derive(NativeClass)]
 #[register_with(Self::register)]
 #[inherit(Node)]
-pub struct HelloWorld {
+pub struct World {
     recv: Receiver<GuiMessage>,
-    network_thread: JoinHandle<()>,
+    _network_thread: JoinHandle<()>,
 }
 
-impl HelloWorld {
+impl World {
     fn new(_owner: &Node) -> Self {
         let (s, r) = unbounded();
 
@@ -41,7 +33,7 @@ impl HelloWorld {
 
         Self {
             recv: r,
-            network_thread: handle,
+            _network_thread: handle,
         }
     }
 
@@ -73,7 +65,7 @@ impl HelloWorld {
 }
 
 #[methods]
-impl HelloWorld {
+impl World {
     #[export]
     fn _ready(&self, _owner: TRef<Node>) {
         GodotLog::init();
