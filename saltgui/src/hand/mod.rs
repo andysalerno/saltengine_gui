@@ -3,9 +3,16 @@ use gdnative::prelude::*;
 use log::info;
 use salt_engine::{cards::UnitCardDefinitionView, game_state::UnitCardInstancePlayerView};
 
-use crate::card_instance::CardInstance;
+use crate::{
+    card_instance::{CardInstance, CARD_DRAGGED},
+    util, SignalName,
+};
 
 const OFFSET_DIST_MULTIPLIER: f32 = 1.75;
+pub(crate) const PLAYER_HAND_CARD_ADDED_SIGNAL: SignalName =
+    SignalName("card_added_to_player_hand");
+
+pub(crate) const PLAYER_HAND_CARD_DRAGGED: SignalName = SignalName("player_hand_card_dragged");
 
 #[derive(NativeClass)]
 #[register_with(Self::register)]
@@ -38,6 +45,45 @@ impl Hand {
             .with_getter(|s: &Self, _| s.hand_len)
             .with_setter(|s, _, value| s.hand_len = value)
             .done();
+
+        builder.add_signal(Signal {
+            name: PLAYER_HAND_CARD_ADDED_SIGNAL.as_ref(),
+            args: &[SignalArgument {
+                name: "path",
+                default: Variant::from_str("<empty_default>"),
+                export_info: ExportInfo::new(VariantType::GodotString),
+                usage: PropertyUsage::DEFAULT,
+            }],
+        });
+
+        builder.add_signal(Signal {
+            name: PLAYER_HAND_CARD_DRAGGED.as_ref(),
+            args: &[
+                SignalArgument {
+                    name: "path",
+                    default: Variant::from_str("<empty_default>"),
+                    export_info: ExportInfo::new(VariantType::GodotString),
+                    usage: PropertyUsage::DEFAULT,
+                },
+                SignalArgument {
+                    name: "is_ended",
+                    default: Variant::from_bool(false),
+                    export_info: ExportInfo::new(VariantType::Bool),
+                    usage: PropertyUsage::DEFAULT,
+                },
+            ],
+        });
+    }
+
+    #[export]
+    fn on_card_dragged(&self, owner: TRef<Spatial>, dragged_card_path: Variant, is_ended: Variant) {
+        info!(
+            "Hand saw card dragged signal: {:?} is ended: {}",
+            dragged_card_path,
+            is_ended.to_bool()
+        );
+
+        owner.emit_signal(PLAYER_HAND_CARD_DRAGGED, &[dragged_card_path, is_ended]);
     }
 }
 
@@ -71,14 +117,19 @@ impl<'a> HandRef<'a> {
             self.node.transform(),
             self.node.translation()
         );
+
         self.node.add_child(card_instance, false);
+        util::connect_signal(&*card_instance, CARD_DRAGGED, self.node, "on_card_dragged");
+
+        let card_path = card_instance.get_path();
+        self.node
+            .emit_signal(PLAYER_HAND_CARD_ADDED_SIGNAL, &[card_path.to_variant()]);
         info!(
-            "Transform after: {:?}, translation before: {:?}",
-            self.node.transform(),
-            self.node.translation()
+            "Signal emitted: {} for path {:?}",
+            PLAYER_HAND_CARD_ADDED_SIGNAL, card_path
         );
 
-        info!("Added child.");
+        info!("Added card {:?} to PlayerHand.", card_path);
     }
 
     // fn center_hand(&self) {

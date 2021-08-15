@@ -1,11 +1,15 @@
 use gdnative::api::InputEventMouseButton;
 use gdnative::prelude::*;
+use log::info;
 
-use crate::util;
+use crate::{util, SignalName};
 
 const CARD_INSTANCE_SCENE: &str = "res://card/creature_instance.tscn";
 const BODY_TEXT_LABEL: &str = "CardBodyText/Viewport/GUI/Panel/RichTextLabel";
 const TITLE_TEXT_LABEL: &str = "CardTitleText/Viewport/GUI/Panel/RichTextLabel";
+
+pub(crate) const CARD_DRAGGED: SignalName = SignalName("card_dragged");
+const INPUT_EVENT: SignalName = SignalName("input_event");
 
 #[derive(NativeClass)]
 #[register_with(Self::register)]
@@ -33,11 +37,21 @@ impl CardInstance {
         self.body = body.to_string();
     }
 
-    fn follow_mouse_start(&mut self, _owner: &Spatial) {
+    fn follow_mouse_start(&mut self, owner: &Spatial) {
+        info!("Emitting signal: PLAYER_HAND_CARD_DRAGGED (starting)");
+        owner.emit_signal(
+            CARD_DRAGGED,
+            &[owner.get_path().to_variant(), false.to_variant()],
+        );
         self.state_is_following_mouse = true;
     }
 
-    fn follow_mouse_stop(&mut self, _owner: &Spatial) {
+    fn follow_mouse_stop(&mut self, owner: &Spatial) {
+        info!("Emitting signal: PLAYER_HAND_CARD_DRAGGED (ending)");
+        owner.emit_signal(
+            CARD_DRAGGED,
+            &[owner.get_path().to_variant(), true.to_variant()],
+        );
         self.state_is_following_mouse = false;
     }
 
@@ -52,9 +66,9 @@ impl CardInstance {
 
         let mouse_pos = root.get_mouse_position();
         let original_global_pos = owner.global_transform().origin;
-        let card_z = original_global_pos.z;
+        let card_z = original_global_pos.z as f64;
 
-        let updated_pos = camera.project_position(mouse_pos, f32::abs(card_z) as f64);
+        let updated_pos = camera.project_position(mouse_pos, f64::abs(card_z));
 
         let mut current = owner.global_transform();
         current.origin.x = updated_pos.x;
@@ -96,15 +110,7 @@ impl CardInstance {
 
         let mouse_collider = owner.get_node("StaticBody").unwrap();
         let mouse_collider = unsafe { mouse_collider.assume_safe_if_sane().unwrap() };
-        mouse_collider
-            .connect(
-                "input_event",
-                owner,
-                "input_event",
-                VariantArray::new_shared(),
-                0,
-            )
-            .expect("failed to connect signal");
+        util::connect_signal(&*mouse_collider, INPUT_EVENT, owner, "input_event");
     }
 
     #[export]
@@ -154,5 +160,23 @@ impl CardInstance {
                 s.body = value;
             })
             .done();
+
+        builder.add_signal(Signal {
+            name: CARD_DRAGGED.as_ref(),
+            args: &[
+                SignalArgument {
+                    name: "path",
+                    default: Variant::from_str("<empty_default>"),
+                    export_info: ExportInfo::new(VariantType::GodotString),
+                    usage: PropertyUsage::DEFAULT,
+                },
+                SignalArgument {
+                    name: "is_ended",
+                    default: Variant::from_bool(false),
+                    export_info: ExportInfo::new(VariantType::Bool),
+                    usage: PropertyUsage::DEFAULT,
+                },
+            ],
+        });
     }
 }
