@@ -76,14 +76,23 @@ impl Hand {
     }
 
     #[export]
-    fn on_card_dragged(&self, owner: TRef<Spatial>, dragged_card_path: Variant, is_ended: Variant) {
+    fn on_card_dragged(
+        &self,
+        owner: TRef<Spatial>,
+        dragged_card_path: Variant,
+        is_ended: Variant,
+        mouse_pos_2d: Variant,
+    ) {
         info!(
             "Hand saw card dragged signal: {:?} is ended: {}",
             dragged_card_path,
             is_ended.to_bool()
         );
 
-        owner.emit_signal(PLAYER_HAND_CARD_DRAGGED, &[dragged_card_path, is_ended]);
+        owner.emit_signal(
+            PLAYER_HAND_CARD_DRAGGED,
+            &[dragged_card_path, is_ended, mouse_pos_2d],
+        );
     }
 }
 

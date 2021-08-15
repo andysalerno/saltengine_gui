@@ -4,7 +4,7 @@ use crate::hand::{Hand, PLAYER_HAND_CARD_ADDED_SIGNAL, PLAYER_HAND_CARD_DRAGGED}
 use crate::{agent::client, hand::HandRef, util};
 use cards::RicketyCannon;
 use crossbeam::channel::{unbounded, Receiver, TryRecvError};
-use gdnative::api::Path;
+use gdnative::api::{Area, Camera, Path};
 use gdnative::prelude::*;
 use godot_log::GodotLog;
 use log::{error, info, warn};
@@ -228,9 +228,10 @@ impl World {
     #[export]
     fn on_hand_card_dragged(
         &mut self,
-        _owner: TRef<Node>,
+        owner: TRef<Node>,
         dragged_card_path: Variant,
         is_ended: Variant,
+        mouse_pos_2d: Variant,
     ) {
         let dragged_card_path = dragged_card_path.to_node_path();
         let is_ended = is_ended.to_bool();
@@ -238,9 +239,48 @@ impl World {
         if is_ended {
             self.state.dragging_hand_card = None;
             info!("World cleared dragged card.");
+            let mouse_pos = mouse_pos_2d.to_vector2();
+            self.find_overlapping_boardslot(owner, mouse_pos);
         } else {
             info!("World storing new dragged card: {:?}", dragged_card_path);
             self.state.dragging_hand_card = Some(dragged_card_path);
+        }
+    }
+
+    fn find_overlapping_boardslot(&self, owner: TRef<Node>, mouse_pos: Vector2) {
+        // Cast ray from the moust position to the BoardSlot layer.
+        // var camera = GetNode<Camera>("Camera");
+        // var from = camera.ProjectRayOrigin(eventMouseButton.Position);
+        // var to = from + camera.ProjectRayNormal(eventMouseButton.Position) * rayLength;
+        let camera = owner.get_node("Camera").unwrap();
+        let camera = unsafe { camera.assume_safe() };
+        let camera = camera.cast::<Camera>().unwrap();
+
+        let project_from = camera.project_ray_origin(mouse_pos);
+        let project_to = project_from + (camera.project_ray_normal(mouse_pos) * 10.);
+        let world = camera.get_world().unwrap();
+        let world = unsafe { world.assume_safe() };
+        let space_state = world.direct_space_state().unwrap();
+        let space_state = unsafe { space_state.assume_safe() };
+
+        let exclude = VariantArray::new_shared();
+        let collision_mask: i64 = 2;
+        let collision = space_state.intersect_ray(
+            project_from,
+            project_to,
+            exclude,
+            collision_mask,
+            false,
+            true,
+        );
+
+        if let Some(collider) = collision.get("collider").try_to_object::<Area>() {
+            let collider = unsafe { collider.assume_safe() };
+            let collided_path = collider.get_path();
+
+            info!("Found collision: {:?}", collided_path);
+        } else {
+            info!("No collision found");
         }
     }
 }

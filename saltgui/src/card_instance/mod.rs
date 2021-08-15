@@ -37,20 +37,28 @@ impl CardInstance {
         self.body = body.to_string();
     }
 
-    fn follow_mouse_start(&mut self, owner: &Spatial) {
+    fn follow_mouse_start(&mut self, owner: &Spatial, mouse_pos: Vector2) {
         info!("Emitting signal: PLAYER_HAND_CARD_DRAGGED (starting)");
         owner.emit_signal(
             CARD_DRAGGED,
-            &[owner.get_path().to_variant(), false.to_variant()],
+            &[
+                owner.get_path().to_variant(),
+                false.to_variant(),
+                mouse_pos.to_variant(),
+            ],
         );
         self.state_is_following_mouse = true;
     }
 
-    fn follow_mouse_stop(&mut self, owner: &Spatial) {
+    fn follow_mouse_stop(&mut self, owner: &Spatial, mouse_pos: Vector2) {
         info!("Emitting signal: PLAYER_HAND_CARD_DRAGGED (ending)");
         owner.emit_signal(
             CARD_DRAGGED,
-            &[owner.get_path().to_variant(), true.to_variant()],
+            &[
+                owner.get_path().to_variant(),
+                true.to_variant(),
+                mouse_pos.to_variant(),
+            ],
         );
         self.state_is_following_mouse = false;
     }
@@ -134,12 +142,13 @@ impl CardInstance {
     ) {
         if let Some(event) = mouse_event.try_to_object::<InputEventMouseButton>() {
             let click = unsafe { event.assume_safe() };
+            let position = click.position();
             if click.is_pressed() {
                 // info!("start following");
-                self.follow_mouse_start(&owner);
+                self.follow_mouse_start(&owner, position);
             } else {
                 // info!("stop following");
-                self.follow_mouse_stop(&owner);
+                self.follow_mouse_stop(&owner, position);
             }
         }
     }
