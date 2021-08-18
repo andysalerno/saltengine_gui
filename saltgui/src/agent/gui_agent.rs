@@ -1,20 +1,25 @@
-use crossbeam::channel::Sender;
+use super::{
+    bi_channel::BiChannel,
+    gui_notifier::GuiNotifier,
+    messages::{FromGui, ToGui},
+};
 use salt_engine::{
     game_agent::game_agent::GameAgent,
-    game_logic::{ClientGameEvent, EndTurnEvent},
+    game_logic::{ClientActionEvent, EndTurnEvent},
     game_state::PlayerId,
 };
 
-use super::gui_message::GuiMessage;
-
 pub(crate) struct GuiAgent {
-    player_id: PlayerId,
-    sender: Sender<GuiMessage>,
+    _player_id: PlayerId,
+    channel: BiChannel<ToGui, FromGui>,
 }
 
 impl GuiAgent {
-    pub fn new_with_id(sender: Sender<GuiMessage>, player_id: PlayerId) -> Self {
-        Self { player_id, sender }
+    pub fn new_with_id(channel: BiChannel<ToGui, FromGui>, player_id: PlayerId) -> Self {
+        Self {
+            _player_id: player_id,
+            channel,
+        }
     }
 }
 
@@ -22,8 +27,8 @@ impl GameAgent for GuiAgent {
     fn get_action(
         &self,
         _game_state: &salt_engine::game_state::GameStatePlayerView,
-    ) -> salt_engine::game_logic::ClientGameEvent {
-        ClientGameEvent::EndTurn(EndTurnEvent)
+    ) -> ClientActionEvent {
+        ClientActionEvent::EndTurn(EndTurnEvent)
     }
 
     fn id(&self) -> salt_engine::game_state::PlayerId {
@@ -35,14 +40,11 @@ impl GameAgent for GuiAgent {
     }
 
     fn observe_state_update(&self, game_state: salt_engine::game_state::GameStatePlayerView) {
-        // for creature_slot in game_state.board().slots_iter().with_creature() {
-        //     let creature = creature_slot.maybe_creature().unwrap();
-        //     // self.manager.spawn_card_instance(creature);
-        //     // self.sender.send("message from the agent".to_string());
-        //     // self.sender.send("message from the agent".to_string());
-        // }
+        let message = ToGui::StateUpdate(game_state);
+        self.channel.send_blocking(message).unwrap();
+    }
 
-        let message = GuiMessage::StateUpdate(game_state);
-        self.sender.send(message).unwrap();
+    fn make_client_notifier(&self) -> Box<dyn salt_engine::game_agent::game_agent::ClientNotifier> {
+        Box::new(GuiNotifier::new(self.channel.clone()))
     }
 }

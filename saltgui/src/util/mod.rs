@@ -1,3 +1,5 @@
+mod godot_extensions;
+
 use std::ops::Deref;
 
 use gdnative::prelude::*;

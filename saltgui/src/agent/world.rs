@@ -1,35 +1,40 @@
-use super::gui_message::GuiMessage;
+use super::bi_channel::BiChannel;
+use super::messages::ToGui;
+use crate::agent::bi_channel::create_channel;
+use crate::agent::gui_agent::GuiAgent;
+use crate::agent::messages::FromGui;
 use crate::board_slot::CLICK_RELEASED_SIGNAL;
 use crate::hand::{Hand, PLAYER_HAND_CARD_ADDED_SIGNAL, PLAYER_HAND_CARD_DRAGGED};
-use crate::{agent::client, hand::HandRef, util};
+use crate::{hand::HandRef, util};
 use cards::RicketyCannon;
-use crossbeam::channel::{unbounded, Receiver, TryRecvError};
-use gdnative::api::{Area, Camera, Path};
+use gdnative::api::utils::NodeExt;
+use gdnative::api::{Area, Camera};
 use gdnative::prelude::*;
 use godot_log::GodotLog;
 use log::{error, info, warn};
 use salt_engine::cards::UnitCardDefinition;
+use salt_engine::game_agent::game_agent::GameAgent;
+use salt_engine::game_logic::ClientEventView;
 use salt_engine::game_state::{MakePlayerView, PlayerId};
 use salt_engine::{
     cards::UnitCardDefinitionView,
     game_state::{GameStatePlayerView, HandView, UnitCardInstancePlayerView},
 };
-use std::ops::Deref;
+use smol::channel::TryRecvError;
 use std::thread::JoinHandle;
 
 const CREATURE_INSTANCE_SCENE: &str = "res://card/creature_instance.tscn";
 const BOARD_SLOT_PATH_PREFIX: &str = "BoardSlot";
 const BOARD_PATH_RELATIVE: &str = "Board";
 const PLAYER_HAND_PATH_RELATIVE: &str = "PlayerHand";
-
 const PLAYER_HAND_NAME: &str = "PlayerHand";
 
 #[derive(NativeClass)]
 #[inherit(Node)]
 pub struct World {
-    recv: Receiver<GuiMessage>,
     _network_thread: JoinHandle<()>,
     state: WorldState,
+    message_channel: BiChannel<FromGui, ToGui>,
 }
 
 #[derive(Debug, Default)]
@@ -39,19 +44,31 @@ struct WorldState {
 
 impl World {
     fn new(_owner: &Node) -> Self {
-        let (s, r) = unbounded();
+        let (gui_side_channel, network_side_channel) = create_channel::<FromGui, ToGui>();
 
         let handle = std::thread::spawn(move || {
-            client::run(s).unwrap_or_else(|e| error!("Client exploded: {}", e));
+            smol::block_on(async {
+                // The agent is a connection between the gui client and gui frontend.
+                let agent = Box::new(GuiAgent::new_with_id(network_side_channel, PlayerId::new()));
+
+                // The client is a connection between the remote game server and the gui client.
+                client::start(agent)
+                    .await
+                    .expect("Failed to start gui client.");
+            });
         });
 
         info!("Websocket server started on a new thread.");
 
         Self {
-            recv: r,
             _network_thread: handle,
             state: WorldState::default(),
+            message_channel: gui_side_channel,
         }
+    }
+
+    fn observe_event(&self, event: ClientEventView, owner: TRef<Node>) {
+        info!("Gui observes event: {:?}", event);
     }
 
     fn update_from_state(&self, state: GameStatePlayerView, owner: TRef<Node>) {
@@ -79,6 +96,8 @@ impl World {
 
         owner.add_child(creature_instance, false);
     }
+
+    fn summon_card_on_boardslot(&self) {}
 }
 
 #[methods]
@@ -115,8 +134,6 @@ impl World {
             owner,
             "on_card_added_to_hand",
         );
-
-        info!("Connected world to signal PLAYER_HAND_CARD_ADDED_SIGNAL");
     }
 
     #[export]
@@ -154,13 +171,6 @@ impl World {
                     owner,
                     "on_boardslot_click_released",
                 );
-
-                info!(
-                    "Connected {:?} to {} of {:?}",
-                    owner.get_path(),
-                    CLICK_RELEASED_SIGNAL,
-                    slot_node.get_path()
-                );
             } else {
                 warn!("Could not find slot node {:?}", path);
             }
@@ -181,22 +191,24 @@ impl World {
 
     #[export]
     fn _process(&self, owner: TRef<Node>, _delta: f64) {
-        let message = match self.recv.try_recv() {
+        let message = match self.message_channel.try_recv() {
             Ok(msg) => msg,
-            Err(TryRecvError::Disconnected) => return, // todo: display something?
+            Err(TryRecvError::Closed) => return, // todo: display something?
             _ => return,
         };
 
         match message {
-            GuiMessage::StateUpdate(state) => self.update_from_state(state, owner),
+            ToGui::StateUpdate(state) => self.update_from_state(state, owner),
+            ToGui::ClientEvent(event) => self.observe_event(event, owner),
         }
     }
 
     fn board(&self, owner: TRef<Node>) -> Option<TRef<Spatial>> {
-        owner
-            .get_node(BOARD_PATH_RELATIVE)
-            .map(|r| unsafe { r.assume_safe() })
-            .map(|r| r.cast::<Spatial>().unwrap())
+        unsafe { owner.as_ref().get_node_as::<Spatial>(BOARD_PATH_RELATIVE) }
+    }
+
+    fn camera(&self, owner: TRef<Node>) -> Option<TRef<Camera>> {
+        unsafe { owner.as_ref().get_node_as::<Camera>("Camera") }
     }
 
     fn player_hand(&self, owner: TRef<Node>) -> Option<RefInstance<Hand, Shared>> {
@@ -240,24 +252,31 @@ impl World {
             self.state.dragging_hand_card = None;
             info!("World cleared dragged card.");
             let mouse_pos = mouse_pos_2d.to_vector2();
-            self.find_overlapping_boardslot(owner, mouse_pos);
+            if let Some(path) = self.find_overlapping_boardslot(owner, mouse_pos) {
+                self.message_channel
+                    .send_blocking(FromGui::SummonFromHandToSlotRequest(path.to_string()))
+                    .expect("Failed to send request from guid to network thread.");
+                info!("User released card over boardslot {:?}", path);
+            } else {
+                info!("User released card, but not over a boardslot.");
+            }
         } else {
             info!("World storing new dragged card: {:?}", dragged_card_path);
             self.state.dragging_hand_card = Some(dragged_card_path);
         }
     }
 
-    fn find_overlapping_boardslot(&self, owner: TRef<Node>, mouse_pos: Vector2) {
+    fn find_overlapping_boardslot(
+        &self,
+        owner: TRef<Node>,
+        mouse_pos: Vector2,
+    ) -> Option<NodePath> {
         // Cast ray from the moust position to the BoardSlot layer.
-        // var camera = GetNode<Camera>("Camera");
-        // var from = camera.ProjectRayOrigin(eventMouseButton.Position);
-        // var to = from + camera.ProjectRayNormal(eventMouseButton.Position) * rayLength;
-        let camera = owner.get_node("Camera").unwrap();
-        let camera = unsafe { camera.assume_safe() };
-        let camera = camera.cast::<Camera>().unwrap();
+        let camera = self.camera(owner).unwrap();
 
         let project_from = camera.project_ray_origin(mouse_pos);
         let project_to = project_from + (camera.project_ray_normal(mouse_pos) * 10.);
+
         let world = camera.get_world().unwrap();
         let world = unsafe { world.assume_safe() };
         let space_state = world.direct_space_state().unwrap();
@@ -274,13 +293,14 @@ impl World {
             true,
         );
 
-        if let Some(collider) = collision.get("collider").try_to_object::<Area>() {
-            let collider = unsafe { collider.assume_safe() };
-            let collided_path = collider.get_path();
-
-            info!("Found collision: {:?}", collided_path);
-        } else {
-            info!("No collision found");
-        }
+        collision
+            .get("collider")
+            .try_to_object::<Area>()
+            .map(|area| {
+                let area = unsafe { area.assume_safe() };
+                let parent = area.get_parent().unwrap();
+                let parent = unsafe { parent.assume_safe() };
+                parent.get_path()
+            })
     }
 }

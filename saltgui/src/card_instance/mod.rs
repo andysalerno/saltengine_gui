@@ -144,10 +144,8 @@ impl CardInstance {
             let click = unsafe { event.assume_safe() };
             let position = click.position();
             if click.is_pressed() {
-                // info!("start following");
                 self.follow_mouse_start(&owner, position);
             } else {
-                // info!("stop following");
                 self.follow_mouse_stop(&owner, position);
             }
         }
