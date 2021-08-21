@@ -3,9 +3,10 @@ use super::{
     gui_notifier::GuiNotifier,
     messages::{FromGui, ToGui},
 };
+use log::info;
 use salt_engine::{
     game_agent::game_agent::GameAgent,
-    game_logic::{ClientActionEvent, EndTurnEvent},
+    game_logic::{ClientActionEvent, EndTurnEvent, SummonCreatureFromHandEvent},
     game_state::PlayerId,
 };
 
@@ -28,6 +29,11 @@ impl GameAgent for GuiAgent {
         &self,
         _game_state: &salt_engine::game_state::GameStatePlayerView,
     ) -> ClientActionEvent {
+        smol::block_on(async {
+            let FromGui::SummonFromHandToSlotRequest(request) = self.channel.recv().await.unwrap();
+            info!("Request FromGui to summon: {}", request);
+        });
+
         ClientActionEvent::EndTurn(EndTurnEvent)
     }
 

@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use log::info;
 use salt_engine::{game_agent::game_agent::ClientNotifier, game_logic::ClientEventView};
 
 use super::{
@@ -20,6 +21,7 @@ impl GuiNotifier {
 #[async_trait]
 impl ClientNotifier for GuiNotifier {
     async fn notify(&self, event: ClientEventView) {
+        info!("GuiNotifier received an event: {:?}", event);
         let msg = ToGui::ClientEvent(event);
         self.channel.send(msg).await.expect("Failed to send");
     }

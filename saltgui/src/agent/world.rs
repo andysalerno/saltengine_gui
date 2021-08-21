@@ -49,12 +49,13 @@ impl World {
         let handle = std::thread::spawn(move || {
             smol::block_on(async {
                 // The agent is a connection between the gui client and gui frontend.
-                let agent = Box::new(GuiAgent::new_with_id(network_side_channel, PlayerId::new()));
+                let make_agent = |player_id| {
+                    Box::new(GuiAgent::new_with_id(network_side_channel, player_id))
+                        as Box<dyn GameAgent>
+                };
 
                 // The client is a connection between the remote game server and the gui client.
-                client::start(agent)
-                    .await
-                    .expect("Failed to start gui client.");
+                client::start(make_agent).await.unwrap();
             });
         });
 
@@ -111,7 +112,7 @@ impl World {
         self.connect_hand_card_dragged(owner);
         self.connect_hand_card_added(owner);
 
-        self.add_card_to_hand(owner);
+        // self.add_card_to_hand(owner);
     }
 
     fn add_card_to_hand(&self, owner: TRef<Node>) {
