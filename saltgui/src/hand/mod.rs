@@ -133,10 +133,6 @@ impl<'a> HandRef<'a> {
         let card_path = card_instance.get_path();
         self.node
             .emit_signal(PLAYER_HAND_CARD_ADDED_SIGNAL, &[card_path.to_variant()]);
-        info!(
-            "Signal emitted: {} for path {:?}",
-            PLAYER_HAND_CARD_ADDED_SIGNAL, card_path
-        );
 
         info!("Added card {:?} to PlayerHand.", card_path);
     }

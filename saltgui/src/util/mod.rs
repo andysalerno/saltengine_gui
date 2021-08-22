@@ -40,20 +40,14 @@ pub(crate) fn connect_signal<T: SubClass<Node>>(
     let target_method = target_method.into();
 
     object
-        .connect(
-            signal,
-            target,
-            target_method.clone(),
-            VariantArray::new_shared(),
-            0,
-        )
+        .connect(signal, target, target_method, VariantArray::new_shared(), 0)
         .expect("Failed binding signal");
 
-    info!(
-        "Bound signal {} from {:?} to {:?}:{}",
-        signal,
-        object.get_path(),
-        target.get_path(),
-        target_method.to_string()
-    );
+    // info!(
+    //     "Bound signal {} from {:?} to {:?}:{}",
+    //     signal,
+    //     object.get_path(),
+    //     target.get_path(),
+    //     target_method.to_string()
+    // );
 }

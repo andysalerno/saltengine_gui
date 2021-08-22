@@ -46,10 +46,6 @@ impl BoardSlot {
         if let Some(event) = mouse_event.try_to_object::<InputEventMouseButton>() {
             let click = unsafe { event.assume_safe() };
             if !click.is_pressed() {
-                info!(
-                    "Signal emitted: CLICK_RELEASED From entity: {:?}",
-                    owner.get_path()
-                );
                 owner.emit_signal(CLICK_RELEASED_SIGNAL, &[owner.get_path().to_variant()]);
             }
         }
