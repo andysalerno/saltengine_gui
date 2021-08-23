@@ -13,8 +13,8 @@ use gdnative::prelude::*;
 use godot_log::GodotLog;
 use log::{error, info, warn};
 use salt_engine::cards::UnitCardDefinition;
-use salt_engine::game_agent::game_agent::GameAgent;
 use salt_engine::game_logic::ClientEventView;
+use salt_engine::game_runner::GameClient;
 use salt_engine::game_state::{MakePlayerView, PlayerId};
 use salt_engine::{
     cards::UnitCardDefinitionView,
@@ -51,11 +51,11 @@ impl World {
                 // The agent is a connection between the gui client and gui frontend.
                 let make_agent = |player_id| {
                     Box::new(GuiAgent::new_with_id(network_side_channel, player_id))
-                        as Box<dyn GameAgent>
+                        as Box<dyn GameClient>
                 };
 
                 // The client is a connection between the remote game server and the gui client.
-                client::start(make_agent).await.unwrap();
+                websocket_client::start(make_agent).await.unwrap();
             });
         });
 
