@@ -1,7 +1,8 @@
-use gdnative::prelude::*;
+use crate::{board_slot::INPUT_EVENT_SIGNAL, util, SignalName};
+use gdnative::{api::InputEventMouseButton, prelude::*};
 use log::info;
 
-use crate::{board_slot::INPUT_EVENT_SIGNAL, util};
+pub(crate) const END_TURN_CLICKED_SIGNAL: SignalName = SignalName("end_turn_clicked");
 
 #[derive(NativeClass)]
 #[register_with(Self::register)]
@@ -37,6 +38,18 @@ impl EndTurnButton {
         _click_normal: Variant,
         _shape_idx: Variant,
     ) {
-        info!("input_event()");
+        if let Some(event) = mouse_event.try_to_object::<InputEventMouseButton>() {
+            let click = unsafe { event.assume_safe() };
+            if !click.is_pressed() {
+                owner.emit_signal(END_TURN_CLICKED_SIGNAL, &[]);
+            }
+        }
+    }
+
+    fn register(builder: &ClassBuilder<Self>) {
+        builder.add_signal(Signal {
+            name: END_TURN_CLICKED_SIGNAL.as_ref(),
+            args: &[],
+        });
     }
 }

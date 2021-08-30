@@ -5,6 +5,7 @@ use crate::agent::gui_agent::GuiClient;
 use crate::agent::messages::FromGui;
 use crate::board_slot::CLICK_RELEASED_SIGNAL;
 use crate::card_instance::CardInstance;
+use crate::end_turn_button::{EndTurnButton, END_TURN_CLICKED_SIGNAL};
 use crate::hand::{Hand, PLAYER_HAND_CARD_ADDED_SIGNAL, PLAYER_HAND_CARD_DRAGGED};
 use crate::{hand::HandRef, util};
 use cards::RicketyCannon;
@@ -29,6 +30,7 @@ const BOARD_SLOT_PATH_PREFIX: &str = "BoardSlot";
 const BOARD_PATH_RELATIVE: &str = "Board";
 const PLAYER_HAND_PATH_RELATIVE: &str = "PlayerHand";
 const PLAYER_HAND_NAME: &str = "PlayerHand";
+const END_TURN_BUTTON: &str = "EndTurnButton";
 
 #[derive(NativeClass)]
 #[inherit(Node)]
@@ -155,6 +157,7 @@ impl World {
         self.connect_boardslot_signals(owner);
         self.connect_hand_card_dragged(owner);
         self.connect_hand_card_added(owner);
+        self.connect_end_turn_clicked(owner);
 
         // self.add_card_to_hand(owner);
     }
@@ -176,6 +179,25 @@ impl World {
         //     owner,
         //     "on_card_added_to_hand",
         // );
+    }
+
+    fn connect_end_turn_clicked(&self, owner: TRef<Node>) {
+        // let hand = self.player_hand(owner).unwrap();
+        let button: RefInstance<EndTurnButton, Shared> = self
+            .get_as(END_TURN_BUTTON, owner)
+            .expect("Could not find end turn button node.");
+
+        util::connect_signal(
+            &*button.base(),
+            END_TURN_CLICKED_SIGNAL,
+            owner,
+            "on_end_turn_clicked",
+        );
+    }
+
+    #[export]
+    fn on_end_turn_clicked(&self, owner: TRef<Node>) {
+        info!("The world sees taht end turn was clicked.");
     }
 
     // #[export]
