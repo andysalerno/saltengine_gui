@@ -12,7 +12,7 @@ pub struct BoardSlot {}
 pub(crate) const CLICK_RELEASED_SIGNAL: SignalName = SignalName("click_released");
 
 /// Internal signal from Godot emitted when there is an input event.
-const INPUT_EVENT_SIGNAL: SignalName = SignalName("input_event");
+pub(crate) const INPUT_EVENT_SIGNAL: SignalName = SignalName("input_event");
 
 impl BoardSlot {
     fn new(_owner: &Spatial) -> Self {
