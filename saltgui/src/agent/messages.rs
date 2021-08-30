@@ -1,4 +1,8 @@
-use salt_engine::{game_logic::ClientEventView, game_state::GameStatePlayerView};
+use gdnative::core_types::NodePath;
+use salt_engine::{
+    game_logic::ClientEventView,
+    game_state::{GameStatePlayerView, UnitCardInstanceId},
+};
 
 #[derive(Debug, Clone)]
 pub(crate) enum ToGui {
@@ -8,5 +12,8 @@ pub(crate) enum ToGui {
 
 #[derive(Debug, Clone)]
 pub(crate) enum FromGui {
-    SummonFromHandToSlotRequest(String),
+    SummonFromHandToSlotRequest {
+        slot_path: String,
+        card_instance_id: UnitCardInstanceId,
+    },
 }

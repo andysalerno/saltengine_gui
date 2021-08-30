@@ -28,7 +28,7 @@ where
     instance.try_cast::<TRoot>().unwrap()
 }
 
-pub(crate) fn connect_signal<T: SubClass<Node>>(
+pub(crate) fn connect_signalz<T: SubClass<Node>>(
     from: &impl SubClass<Node>,
     signal: SignalName,
     target: TRef<T>,
@@ -50,4 +50,18 @@ pub(crate) fn connect_signal<T: SubClass<Node>>(
     //     target.get_path(),
     //     target_method.to_string()
     // );
+}
+
+pub(crate) fn connect_signal<U: SubClass<Node>>(
+    from: impl Deref<Target = U>,
+    signal: SignalName,
+    target: impl AsArg<Object>,
+    target_method: impl Into<GodotString>,
+) {
+    let target_method = target_method.into();
+
+    let node = from.upcast::<Node>();
+
+    node.connect(signal, target, target_method, VariantArray::new_shared(), 0)
+        .expect("Failed binding signal");
 }

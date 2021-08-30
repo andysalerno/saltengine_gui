@@ -107,30 +107,61 @@ impl<'a> HandRef<'a> {
 
     pub fn add_card(&mut self, card: &UnitCardInstancePlayerView) {
         let card_instance = CardInstance::new_instance();
-        let (card_instance, _) = card_instance.decouple();
-        let card_instance = card_instance.into_shared();
-        let card_instance = unsafe { card_instance.assume_safe() };
-
-        card_instance.set("title", card.definition().title());
-        card_instance.set("body", card.definition().text());
 
         let hand = self.node.cast_instance::<Hand>().unwrap();
         let offset = hand.map(|n, _| n.hand_len).unwrap() as f32 * OFFSET_DIST_MULTIPLIER;
 
-        card_instance.translate(Vector3::new(offset, 0., 0.));
+        card_instance
+            .map_mut(|c, n| {
+                let def = card.definition();
+                c.set_title(def.title());
+                c.set_body(def.text());
+
+                c.set_view(card.clone());
+
+                n.translate(Vector3::new(offset, 0., 0.));
+
+                util::connect_signal(n, CARD_DRAGGED, self.node, "on_card_dragged");
+            })
+            .unwrap();
 
         hand.map_mut(|hand, _| hand.hand_len += 1).unwrap();
 
-        info!(
-            "Transform before: {:?}, translation before: {:?}",
-            self.node.transform(),
-            self.node.translation()
-        );
-
+        // let card_instance = card_instance.into_base().into_shared();
+        let card_instance = card_instance.into_base();
+        let card_instance = card_instance.into_shared();
         self.node.add_child(card_instance, false);
-        util::connect_signal(&*card_instance, CARD_DRAGGED, self.node, "on_card_dragged");
 
+        let card_instance = unsafe { card_instance.assume_safe() };
         let card_path = card_instance.get_path();
+
+        // what happens if we try getting it now?
+
+        // try doing it after adding to scene??
+        // let card_instance = card_instance
+        //     .cast_instance::<CardInstance>()
+        //     .expect("Could not cast to CardInstance.");
+
+        //card_instance.map(|a, b| {});
+        // let card_cloned = card.clone();
+        // let node_cloned = self.node;
+
+        // card_instance
+        //     .map_mut(move |c, n| {
+        //         info!("Start card_instance map_mut.");
+        //         let def = card_cloned.definition();
+        //         c.set_title(def.title());
+        //         c.set_body(def.text());
+
+        //         // c.set_view(card.clone());
+
+        //         n.translate(Vector3::new(offset, 0., 0.));
+
+        //         util::connect_signal(n, CARD_DRAGGED, node_cloned, "on_card_dragged");
+        //         info!("Done mapping signal in card instance map_mut.");
+        //     })
+        //     .unwrap();
+
         self.node
             .emit_signal(PLAYER_HAND_CARD_ADDED_SIGNAL, &[card_path.to_variant()]);
 

@@ -8,39 +8,53 @@ use log::info;
 use salt_engine::{
     game_logic::{ClientActionEvent, EndTurnEvent, SummonCreatureFromHandEvent},
     game_runner::GameClient,
-    game_state::PlayerId,
+    game_state::{
+        board::{BoardPos, RowId},
+        PlayerId,
+    },
 };
 
-pub(crate) struct GuiAgent {
-    _player_id: PlayerId,
+pub(crate) struct GuiClient {
+    player_id: PlayerId,
     channel: BiChannel<ToGui, FromGui>,
 }
 
-impl GuiAgent {
+impl GuiClient {
     pub fn new_with_id(channel: BiChannel<ToGui, FromGui>, player_id: PlayerId) -> Self {
-        Self {
-            _player_id: player_id,
-            channel,
-        }
+        Self { player_id, channel }
     }
 
     fn id(&self) -> salt_engine::game_state::PlayerId {
-        todo!()
+        self.player_id
     }
 }
 
 #[async_trait]
-impl GameClient for GuiAgent {
+impl GameClient for GuiClient {
     async fn next_action(
         &mut self,
         _game_state: salt_engine::game_state::GameStatePlayerView,
     ) -> ClientActionEvent {
-        smol::block_on(async {
-            let FromGui::SummonFromHandToSlotRequest(request) = self.channel.recv().await.unwrap();
-            info!("Request FromGui to summon: {}", request);
-        });
+        info!("next_action invoked on GuiClient. Waiting for message from godot...");
 
-        ClientActionEvent::EndTurn(EndTurnEvent)
+        let FromGui::SummonFromHandToSlotRequest {
+            slot_path,
+            card_instance_id,
+        } = self.channel.recv().await.unwrap();
+
+        info!(
+            "From GUI to client: summon card id {} to path {}",
+            card_instance_id, slot_path
+        );
+
+        let e = SummonCreatureFromHandEvent::new(
+            self.id(),
+            BoardPos::new(self.id(), RowId::BackRow, 0),
+            card_instance_id,
+        );
+
+        //ClientActionEvent::EndTurn(EndTurnEvent)
+        ClientActionEvent::SummonCreatureFromHand(e)
     }
 
     async fn make_prompter(&self) -> Box<dyn salt_engine::game_agent::Prompter> {
@@ -51,6 +65,7 @@ impl GameClient for GuiAgent {
         &mut self,
         game_state: salt_engine::game_state::GameStatePlayerView,
     ) {
+        info!("GuiClient::observe_state_update()");
         let message = ToGui::StateUpdate(game_state);
         self.channel.send_blocking(message).unwrap();
     }
@@ -59,7 +74,7 @@ impl GameClient for GuiAgent {
         Box::new(GuiNotifier::new(self.channel.clone()))
     }
 
-    async fn on_turn_start(&mut self, game_state: &salt_engine::game_state::GameState) {
-        todo!()
+    async fn on_turn_start(&mut self, _game_state: &salt_engine::game_state::GameState) {
+        info!("GuiClient saw: on_turn_start()");
     }
 }

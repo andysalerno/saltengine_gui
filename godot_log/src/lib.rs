@@ -20,7 +20,13 @@ impl Log for GodotLog {
     }
 
     fn log(&self, record: &log::Record) {
-        godot_print!("[{}] {}", record.level(), record.args());
+        godot_print!(
+            "[{}][{}][{}] {}",
+            record.level(),
+            record.module_path().unwrap_or("??"),
+            record.line().unwrap_or(0),
+            record.args()
+        );
     }
 
     fn flush(&self) {}

@@ -1,9 +1,10 @@
 use super::bi_channel::BiChannel;
 use super::messages::ToGui;
 use crate::agent::bi_channel::create_channel;
-use crate::agent::gui_agent::GuiAgent;
+use crate::agent::gui_agent::GuiClient;
 use crate::agent::messages::FromGui;
 use crate::board_slot::CLICK_RELEASED_SIGNAL;
+use crate::card_instance::CardInstance;
 use crate::hand::{Hand, PLAYER_HAND_CARD_ADDED_SIGNAL, PLAYER_HAND_CARD_DRAGGED};
 use crate::{hand::HandRef, util};
 use cards::RicketyCannon;
@@ -13,9 +14,9 @@ use gdnative::prelude::*;
 use godot_log::GodotLog;
 use log::{error, info, warn};
 use salt_engine::cards::UnitCardDefinition;
-use salt_engine::game_logic::ClientEventView;
+use salt_engine::game_logic::{AddCardToHandClientEvent, ClientEventView};
 use salt_engine::game_runner::GameClient;
-use salt_engine::game_state::{MakePlayerView, PlayerId};
+use salt_engine::game_state::{MakePlayerView, PlayerId, UnitCardInstanceId};
 use salt_engine::{
     cards::UnitCardDefinitionView,
     game_state::{GameStatePlayerView, HandView, UnitCardInstancePlayerView},
@@ -40,6 +41,7 @@ pub struct World {
 #[derive(Debug, Default)]
 struct WorldState {
     dragging_hand_card: Option<NodePath>,
+    card_to_summon: Option<(NodePath, NodePath)>,
 }
 
 impl World {
@@ -50,7 +52,7 @@ impl World {
             smol::block_on(async {
                 // The agent is a connection between the gui client and gui frontend.
                 let make_agent = |player_id| {
-                    Box::new(GuiAgent::new_with_id(network_side_channel, player_id))
+                    Box::new(GuiClient::new_with_id(network_side_channel, player_id))
                         as Box<dyn GameClient>
                 };
 
@@ -70,6 +72,10 @@ impl World {
 
     fn observe_event(&self, event: ClientEventView, owner: TRef<Node>) {
         info!("Gui observes event: {:?}", event);
+
+        match event {
+            ClientEventView::AddCardToHand(e) => self.add_card_to_hand(e, owner),
+        }
     }
 
     fn update_from_state(&self, state: GameStatePlayerView, owner: TRef<Node>) {
@@ -99,6 +105,44 @@ impl World {
     }
 
     fn summon_card_on_boardslot(&self) {}
+
+    /// Get a shared `RefInstance` to the player's Hand.
+    fn player_hand(&self, owner: TRef<Node>) -> Option<RefInstance<Hand, Shared>> {
+        self.get_as(PLAYER_HAND_PATH_RELATIVE, owner)
+    }
+
+    /// Get a card instance given its path.
+    fn card_instance(
+        &self,
+        path: impl AsRef<str>,
+        owner: TRef<Node>,
+    ) -> Option<RefInstance<CardInstance, Shared>> {
+        self.get_as(path, owner)
+    }
+
+    fn get_as<T, B>(
+        &self,
+        path: impl AsRef<str>,
+        owner: TRef<Node>,
+    ) -> Option<RefInstance<T, Shared>>
+    where
+        T: NativeClass<Base = B>,
+        B: SubClass<Node>,
+    {
+        owner
+            .get_node(path)
+            .map(|r| unsafe { r.assume_safe() })
+            .map(|r| r.cast::<B>().unwrap())
+            .map(|r| r.cast_instance::<T>().unwrap())
+    }
+
+    fn board(&self, owner: TRef<Node>) -> Option<TRef<Spatial>> {
+        unsafe { owner.as_ref().get_node_as::<Spatial>(BOARD_PATH_RELATIVE) }
+    }
+
+    fn camera(&self, owner: TRef<Node>) -> Option<TRef<Camera>> {
+        unsafe { owner.as_ref().get_node_as::<Camera>("Camera") }
+    }
 }
 
 #[methods]
@@ -115,44 +159,41 @@ impl World {
         // self.add_card_to_hand(owner);
     }
 
-    fn add_card_to_hand(&self, owner: TRef<Node>) {
+    fn add_card_to_hand(&self, event: AddCardToHandClientEvent, owner: TRef<Node>) {
         info!("World is adding a card to the player's hand.");
         let hand = self.player_hand(owner).unwrap();
         let mut hand = HandRef::new(hand.base());
 
-        let dummy_card = RicketyCannon.make_instance();
-        let dummy_card = dummy_card.player_view(PlayerId::new());
-
-        hand.add_card(&dummy_card);
+        hand.add_card(&event.card);
     }
 
     fn connect_hand_card_added(&self, owner: TRef<Node>) {
-        let hand = self.player_hand(owner).unwrap();
+        // let hand = self.player_hand(owner).unwrap();
 
-        util::connect_signal(
-            &*hand.base(),
-            PLAYER_HAND_CARD_ADDED_SIGNAL,
-            owner,
-            "on_card_added_to_hand",
-        );
+        // util::connect_signal(
+        //     &*hand.base(),
+        //     PLAYER_HAND_CARD_ADDED_SIGNAL,
+        //     owner,
+        //     "on_card_added_to_hand",
+        // );
     }
 
-    #[export]
-    fn on_card_added_to_hand(&self, owner: TRef<Node>, card_added_path: Variant) {
-        let card_added_path = card_added_path.to_node_path();
-        info!(
-            "World observed signal card added to player hand: {:?}",
-            card_added_path
-        );
+    // #[export]
+    // fn on_card_added_to_hand(&self, owner: TRef<Node>, card_added_path: Variant) {
+    //     let card_added_path = card_added_path.to_node_path();
+    //     info!(
+    //         "World observed signal card added to player hand: {:?}",
+    //         card_added_path
+    //     );
 
-        let card_added = owner
-            .get_node(card_added_path)
-            .expect("Did not find card added at given path.");
+    //     let card_added = owner
+    //         .get_node(card_added_path)
+    //         .expect("Did not find card added at given path.");
 
-        let card_added = unsafe { card_added.assume_safe() };
+    //     let card_added = unsafe { card_added.assume_safe() };
 
-        // card_added.con
-    }
+    //     // card_added.con
+    // }
 
     fn connect_boardslot_signals(&self, owner: TRef<Node>) {
         info!("Looking for boardslot children of {:?}", owner.get_path());
@@ -191,7 +232,25 @@ impl World {
     }
 
     #[export]
-    fn _process(&self, owner: TRef<Node>, _delta: f64) {
+    fn _process(&mut self, owner: TRef<Node>, _delta: f64) {
+        if let Some((slot_path, card_path)) = self.state.card_to_summon.take() {
+            info!("Summoning card from within _process().");
+            let card_inst = self
+                .card_instance(card_path.to_string(), owner)
+                .expect("Could not find card instance.");
+
+            info!("using map to do the thing........");
+            let card_instance_id = card_inst.map(|a, _| a.expect_view().id()).unwrap();
+            let slot_path = slot_path.to_string();
+
+            self.message_channel
+                .send_blocking(FromGui::SummonFromHandToSlotRequest {
+                    slot_path,
+                    card_instance_id,
+                })
+                .expect("Failed to send request from guid to network thread.");
+        }
+
         let message = match self.message_channel.try_recv() {
             Ok(msg) => msg,
             Err(TryRecvError::Closed) => return, // todo: display something?
@@ -202,22 +261,6 @@ impl World {
             ToGui::StateUpdate(state) => self.update_from_state(state, owner),
             ToGui::ClientEvent(event) => self.observe_event(event, owner),
         }
-    }
-
-    fn board(&self, owner: TRef<Node>) -> Option<TRef<Spatial>> {
-        unsafe { owner.as_ref().get_node_as::<Spatial>(BOARD_PATH_RELATIVE) }
-    }
-
-    fn camera(&self, owner: TRef<Node>) -> Option<TRef<Camera>> {
-        unsafe { owner.as_ref().get_node_as::<Camera>("Camera") }
-    }
-
-    fn player_hand(&self, owner: TRef<Node>) -> Option<RefInstance<Hand, Shared>> {
-        owner
-            .get_node(PLAYER_HAND_PATH_RELATIVE)
-            .map(|r| unsafe { r.assume_safe() })
-            .map(|r| r.cast::<Spatial>().unwrap())
-            .map(|r| r.cast_instance::<Hand>().unwrap())
     }
 
     #[export]
@@ -253,11 +296,32 @@ impl World {
             self.state.dragging_hand_card = None;
             info!("World cleared dragged card.");
             let mouse_pos = mouse_pos_2d.to_vector2();
-            if let Some(path) = self.find_overlapping_boardslot(owner, mouse_pos) {
-                self.message_channel
-                    .send_blocking(FromGui::SummonFromHandToSlotRequest(path.to_string()))
-                    .expect("Failed to send request from guid to network thread.");
-                info!("User released card over boardslot {:?}", path);
+            if let Some(slot_path) = self.find_overlapping_boardslot(owner, mouse_pos) {
+                self.state.card_to_summon = Some((slot_path, dragged_card_path));
+
+                // Try to get the card ref...
+                // let card_inst = self
+                //     .card_instance(&card_in_hand_path, owner)
+                //     .expect("Could not find card instance.");
+
+                // info!("using map to do the thing........");
+                // card_inst
+                //     .map(|a, b| {
+                //         info!("Saw card with ID {}", a.title());
+                //     })
+                //     .unwrap();
+
+                // let card_inst = card_inst.script();
+
+                // info!("Guid is attempting to summon card from hand with ID {}", id);
+
+                // self.message_channel
+                //     .send_blocking(FromGui::SummonFromHandToSlotRequest {
+                //         slot_path,
+                //         card_in_hand_path,
+                //     })
+                //     .expect("Failed to send request from guid to network thread.");
+                // info!("User released card over boardslot {:?}", path);
             } else {
                 info!("User released card, but not over a boardslot.");
             }

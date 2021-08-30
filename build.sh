@@ -1,6 +1,2 @@
-#!/usr/bin/bash
-
-cargo build \
-	&& cp target/debug/agent.dll ../DummyProj/networking \
-	&& cp target/debug/card_instance.dll ../DummyProj/card
-
+#!/usr/bin/sh
+cargo build && cp target/debug/saltgui.dll ../saltgui_godot/links/saltgui.dll

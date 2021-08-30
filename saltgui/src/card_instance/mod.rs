@@ -1,6 +1,7 @@
 use gdnative::api::InputEventMouseButton;
 use gdnative::prelude::*;
 use log::info;
+use salt_engine::game_state::UnitCardInstancePlayerView;
 
 use crate::{util, SignalName};
 
@@ -18,6 +19,7 @@ pub struct CardInstance {
     title: String,
     body: String,
     state_is_following_mouse: bool,
+    view: Option<UnitCardInstancePlayerView>,
 }
 
 impl CardInstance {
@@ -26,7 +28,12 @@ impl CardInstance {
             title: "unset".to_string(),
             body: "unset".to_string(),
             state_is_following_mouse: false,
+            view: None,
         }
+    }
+
+    pub fn title(&self) -> &str {
+        &self.title
     }
 
     pub fn set_title(&mut self, title: impl ToString) {
@@ -35,6 +42,15 @@ impl CardInstance {
 
     pub fn set_body(&mut self, body: impl ToString) {
         self.body = body.to_string();
+    }
+
+    pub fn set_view(&mut self, view: UnitCardInstancePlayerView) {
+        info!("Setting view of card to one with id: {}", view.id());
+        self.view = Some(view);
+    }
+
+    pub fn expect_view(&self) -> &UnitCardInstancePlayerView {
+        self.view.as_ref().unwrap()
     }
 
     fn follow_mouse_start(&mut self, owner: &Spatial, mouse_pos: Vector2) {
