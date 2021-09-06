@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use log::info;
-use salt_engine::{game_agent::ClientNotifier, game_logic::ClientEventView};
+use salt_engine::{game_agent::ClientNotifier, game_logic::events::ClientEventView};
 
 use super::{
     bi_channel::BiChannel,

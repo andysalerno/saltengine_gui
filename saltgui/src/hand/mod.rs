@@ -106,6 +106,8 @@ impl<'a> HandRef<'a> {
     }
 
     pub fn add_card(&mut self, card: &UnitCardInstancePlayerView) {
+        info!("Hand is receiving a card: {}", card.definition().title());
+
         let card_instance = CardInstance::new_instance();
 
         let hand = self.node.cast_instance::<Hand>().unwrap();

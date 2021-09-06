@@ -6,7 +6,7 @@ use super::{
 use async_trait::async_trait;
 use log::info;
 use salt_engine::{
-    game_logic::{ClientActionEvent, EndTurnEvent, SummonCreatureFromHandEvent},
+    game_logic::events::{ClientActionEvent, EndTurnEvent, SummonCreatureFromHandEvent},
     game_runner::GameClient,
     game_state::{
         board::{BoardPos, RowId},
@@ -21,6 +21,7 @@ pub(crate) struct GuiClient {
 
 impl GuiClient {
     pub fn new_with_id(channel: BiChannel<ToGui, FromGui>, player_id: PlayerId) -> Self {
+        channel.send_blocking(ToGui::PlayerIdSet(player_id));
         Self { player_id, channel }
     }
 

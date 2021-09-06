@@ -3,10 +3,11 @@ use super::messages::ToGui;
 use crate::agent::bi_channel::create_channel;
 use crate::agent::gui_agent::GuiClient;
 use crate::agent::messages::FromGui;
-use crate::board_slot::CLICK_RELEASED_SIGNAL;
+use crate::board_slot::{BoardSlot, CLICK_RELEASED_SIGNAL};
 use crate::card_instance::CardInstance;
 use crate::end_turn_button::{EndTurnButton, END_TURN_CLICKED_SIGNAL};
 use crate::hand::{Hand, PLAYER_HAND_CARD_ADDED_SIGNAL, PLAYER_HAND_CARD_DRAGGED};
+use crate::util::NodeRef;
 use crate::{hand::HandRef, util};
 use cards::RicketyCannon;
 use gdnative::api::utils::NodeExt;
@@ -14,8 +15,12 @@ use gdnative::api::{Area, Camera};
 use gdnative::prelude::*;
 use godot_log::GodotLog;
 use log::{error, info, warn};
-use salt_engine::game_logic::{AddCardToHandClientEvent, ClientEventView};
+use salt_engine::game_logic::events::{
+    AddCardToHandClientEvent, ClientEventView, SummonCreatureFromHandClientEvent,
+};
 use salt_engine::game_runner::GameClient;
+use salt_engine::game_state::board::BoardPos;
+use salt_engine::game_state::PlayerId;
 use salt_engine::{
     cards::UnitCardDefinitionView,
     game_state::{GameStatePlayerView, HandView, UnitCardInstancePlayerView},
@@ -24,6 +29,7 @@ use smol::channel::TryRecvError;
 use std::thread::JoinHandle;
 
 const CREATURE_INSTANCE_SCENE: &str = "res://card/creature_instance.tscn";
+const BOARD_SLOT_COUNT: usize = 24;
 const BOARD_SLOT_PATH_PREFIX: &str = "BoardSlot";
 const BOARD_PATH_RELATIVE: &str = "Board";
 const PLAYER_HAND_PATH_RELATIVE: &str = "PlayerHand";
@@ -40,6 +46,7 @@ pub struct World {
 
 #[derive(Debug, Default)]
 struct WorldState {
+    player_id: Option<PlayerId>,
     dragging_hand_card: Option<NodePath>,
     card_to_summon: Option<(NodePath, NodePath)>,
 }
@@ -70,41 +77,49 @@ impl World {
         }
     }
 
-    fn observe_event(&self, event: ClientEventView, owner: TRef<Node>) {
+    fn observe_notifier_event(&self, event: ClientEventView, owner: TRef<Node>) {
         info!("Gui observes event: {:?}", event);
 
         match event {
             ClientEventView::AddCardToHand(e) => self.add_card_to_hand(e, owner),
+            ClientEventView::SummonCreatureFromHand(e) => {
+                self.summon_card_on_boardslot(e, owner);
+                info!("Looks like the other player summoned something");
+            }
         }
     }
 
     fn update_from_state(&self, state: GameStatePlayerView, owner: TRef<Node>) {
-        info!("Updating from state.");
-        let hand_ref = owner.get_node(PLAYER_HAND_NAME).unwrap();
-        let hand_ref = unsafe { hand_ref.assume_safe() };
-        let hand_ref = hand_ref.cast::<Spatial>().unwrap();
-        let mut hand_ref = HandRef::new(hand_ref);
-        for hand_card in state.hand().cards() {
-            info!("iterating over hand_card...");
-            hand_ref.add_card(hand_card);
-        }
+        // info!("Updating from state.");
+        // let hand_ref = owner.get_node(PLAYER_HAND_NAME).unwrap();
+        // let hand_ref = unsafe { hand_ref.assume_safe() };
+        // let hand_ref = hand_ref.cast::<Spatial>().unwrap();
+        // let mut hand_ref = HandRef::new(hand_ref);
+        // for hand_card in state.hand().cards() {
+        //     info!("iterating over hand_card...");
+        //     hand_ref.add_card(hand_card);
+        // }
     }
 
-    fn add_card_instance(&self, card_view: &UnitCardInstancePlayerView, owner: TRef<Node>) {
-        let creature_instance = util::load_scene(CREATURE_INSTANCE_SCENE).unwrap();
-        let creature_instance = util::instance_scene::<Spatial>(&creature_instance);
+    fn summon_card_on_boardslot(
+        &self,
+        event: SummonCreatureFromHandClientEvent,
+        owner: TRef<Node>,
+    ) {
+        info!("World saw a summon event.");
+        let slot_index = self.boardslot_from_pos(owner, event.board_pos);
+        let slot_path = format!(
+            "{}/{}{}",
+            BOARD_PATH_RELATIVE, BOARD_SLOT_PATH_PREFIX, slot_index
+        );
+        let slot: NodeRef<BoardSlot> = NodeRef::from_parent_ref(&slot_path, owner);
 
-        creature_instance.set("title", card_view.definition().title());
-        creature_instance.set("body", card_view.definition().text());
+        info!("Sending summon request to slot: {}", slot_path);
 
-        let mut current_translation = creature_instance.translation();
-        current_translation.z = -4.5;
-        creature_instance.set_translation(current_translation);
-
-        owner.add_child(creature_instance, false);
+        let slot = slot.resolve_instance();
+        slot.map_mut(|a, b| a.receive_summon(event))
+            .expect("Failed to receive summon for slot");
     }
-
-    fn summon_card_on_boardslot(&self) {}
 
     /// Get a shared `RefInstance` to the player's Hand.
     fn player_hand(&self, owner: TRef<Node>) -> Option<RefInstance<Hand, Shared>> {
@@ -143,6 +158,39 @@ impl World {
     fn camera(&self, owner: TRef<Node>) -> Option<TRef<Camera>> {
         unsafe { owner.as_ref().get_node_as::<Camera>("Camera") }
     }
+
+    fn boardslot_from_pos(&self, _owner: TRef<Node>, pos: BoardPos) -> usize {
+        let row_len = BOARD_SLOT_COUNT / 4;
+
+        let offset = if pos.player_id == self.state.player_id.expect("Player ID not yet set.") {
+            let player_offset = row_len * 2;
+
+            let row_offset = match pos.row_id {
+                salt_engine::game_state::board::RowId::FrontRow => 0,
+                salt_engine::game_state::board::RowId::BackRow => row_len,
+                salt_engine::game_state::board::RowId::Hero => todo!("hero not done yet"),
+            };
+
+            let index_offset = pos.row_index;
+
+            player_offset + row_offset + index_offset
+        } else {
+            let player_offset = 0;
+
+            let row_offset = match pos.row_id {
+                salt_engine::game_state::board::RowId::FrontRow => row_len,
+                salt_engine::game_state::board::RowId::BackRow => 0,
+                salt_engine::game_state::board::RowId::Hero => todo!("hero not done yet"),
+            };
+
+            let index_offset = pos.row_index;
+
+            player_offset + row_offset + index_offset
+        };
+
+        // In the Godot world, slots begin at index 1 instead of 0
+        offset + 1
+    }
 }
 
 #[methods]
@@ -150,7 +198,7 @@ impl World {
     #[export]
     fn _ready(&self, owner: TRef<Node>) {
         GodotLog::init();
-        info!("World initialized.");
+        info!("World initialized.  Hello.");
 
         self.connect_boardslot_signals(owner);
         self.connect_hand_card_dragged(owner);
@@ -206,7 +254,7 @@ impl World {
 
         let board = self.board(owner).unwrap();
 
-        for slot_index in 1..19 {
+        for slot_index in 1..=BOARD_SLOT_COUNT {
             let path = format!("{}{}", BOARD_SLOT_PATH_PREFIX, slot_index);
             if let Some(slot_node) = board.get_node(&path) {
                 let slot_node = unsafe { slot_node.assume_safe() };
@@ -265,7 +313,8 @@ impl World {
 
         match message {
             ToGui::StateUpdate(state) => self.update_from_state(state, owner),
-            ToGui::ClientEvent(event) => self.observe_event(event, owner),
+            ToGui::ClientEvent(event) => self.observe_notifier_event(event, owner),
+            ToGui::PlayerIdSet(player_id) => self.state.player_id = Some(player_id),
         }
     }
 

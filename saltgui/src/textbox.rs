@@ -9,12 +9,12 @@ use gdnative::{
 };
 use log::info;
 
-const LABEL_PATH: &str = "CardTitleText/Viewport/GUI/Panel/RichTextLabel";
+const LABEL_PATH: &str = "Viewport/GUI/Panel/RichTextLabel";
 
 #[derive(NativeClass)]
 #[register_with(Self::register)]
 #[inherit(Spatial)]
-pub(crate) struct TextBox {
+pub struct TextBox {
     textbox: Option<NodeRef<RichTextLabel>>,
 }
 
@@ -32,23 +32,31 @@ impl TextBox {
 
         self.textbox = Some(r);
 
-        info!("Textbox generated.");
+        self.set_text("(empty)");
     }
-    fn register(builder: &ClassBuilder<Self>) {
-        // builder
-        //     .add_property::<String>("title")
-        //     .with_getter(|s: &Self, _| s.title.clone())
-        //     .with_setter(|s: &mut Self, _owner, value| {
-        //         s.title = value;
-        //     })
-        //     .done();
 
-        // builder
-        //     .add_property::<String>("body")
-        //     .with_getter(|s: &Self, _| s.body.clone())
-        //     .with_setter(|s: &mut Self, _owner, value| {
-        //         s.body = value;
-        //     })
-        //     .done();
+    pub fn set_text(&self, text: &str) {
+        if let Some(textbox) = &self.textbox {
+            let x = textbox.resolve_ref();
+            x.set_text(text);
+        }
+    }
+
+    pub fn get_text(&self) -> GodotString {
+        self.textbox.as_ref().map_or_else(
+            || String::new().into(),
+            |textbox| {
+                let x = textbox.resolve_ref();
+                x.text()
+            },
+        )
+    }
+
+    fn register(builder: &ClassBuilder<Self>) {
+        builder
+            .add_property::<GodotString>("text")
+            .with_getter(|s: &Self, _| s.get_text())
+            .with_setter(|s: &mut Self, _owner, value| s.set_text(&value.to_string()))
+            .done();
     }
 }

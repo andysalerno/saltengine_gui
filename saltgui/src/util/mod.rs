@@ -46,10 +46,7 @@ pub(crate) fn connect_signal<U: SubClass<Node>>(
         .expect("Failed binding signal");
 }
 
-pub(crate) struct NodeRef<T>
-where
-    T: GodotObject<RefKind = ManuallyManaged> + SubClass<Node>,
-{
+pub(crate) struct NodeRef<T> {
     _phantom: std::marker::PhantomData<T>,
     reference: Ref<Node>,
     path: String,
@@ -57,10 +54,18 @@ where
 
 impl<T> NodeRef<T>
 where
-    T: GodotObject<RefKind = ManuallyManaged> + SubClass<Node>,
+    // T: GodotObject<RefKind = ManuallyManaged> + SubClass<Node>,
+    T: SubClass<Node>,
 {
     // pub fn from_parent(path: String, parent: &Node) -> Self {
     //     let child = parent.get_node("hi").unwrap();
+
+    //     Self::from_existing(path, child)
+    // }
+
+    // pub fn from_parentz(path: impl AsRef<str>, parent: Ref<impl SubClass<Node>>) -> Self {
+    //     //let x = parent.upcast::<Node>();
+    //     let child = parent.get_node(path.as_ref()).unwrap();
 
     //     Self::from_existing(path, child)
     // }
@@ -70,14 +75,6 @@ where
         let child = x.get_node(path.as_ref()).unwrap();
 
         Self::from_existing(path, child)
-    }
-
-    pub fn from_existing(path: impl AsRef<str>, reference: Ref<Node>) -> Self {
-        Self {
-            _phantom: std::marker::PhantomData::default(),
-            reference,
-            path: path.as_ref().to_string(),
-        }
     }
 
     pub fn resolve(&self) -> TRef<T> {
@@ -90,5 +87,34 @@ where
         let r = unsafe { self.reference.assume_safe() };
         let r = r.cast::<T>().unwrap();
         r.as_ref()
+    }
+}
+
+impl<T> NodeRef<T> {
+    pub fn from_existing(path: impl AsRef<str>, reference: Ref<Node>) -> Self {
+        Self {
+            _phantom: std::marker::PhantomData::default(),
+            reference,
+            path: path.as_ref().to_string(),
+        }
+    }
+}
+
+impl<T> NodeRef<T>
+where
+    // T: NativeClass<Base = Node>,
+    T: NativeClass<Base = Spatial>,
+{
+    pub fn from_parent_ref(path: impl AsRef<str>, parent: TRef<Node>) -> Self {
+        let child = parent.get_node(path.as_ref()).unwrap();
+
+        Self::from_existing(path, child)
+    }
+
+    pub fn resolve_instance(&self) -> RefInstance<T, Shared> {
+        let r = unsafe { self.reference.assume_safe() };
+        let r = r.cast::<Spatial>().unwrap();
+        let r = r.cast_instance::<T>().unwrap();
+        r
     }
 }
