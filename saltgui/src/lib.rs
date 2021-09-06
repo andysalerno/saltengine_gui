@@ -10,9 +10,9 @@ mod board_slot;
 mod card_instance;
 mod end_turn_button;
 mod hand;
+mod signal_manager;
+mod textbox;
 mod util;
-
-use std::fmt::Write;
 
 use agent::world::World;
 use board_slot::BoardSlot;
@@ -21,6 +21,8 @@ use end_turn_button::EndTurnButton;
 use gdnative::prelude::*;
 use godot_log::GodotLog;
 use hand::Hand;
+use signal_manager::SignalManager;
+use textbox::TextBox;
 
 fn init(handle: InitHandle) {
     GodotLog::init();
@@ -29,6 +31,8 @@ fn init(handle: InitHandle) {
     handle.add_class::<Hand>();
     handle.add_class::<BoardSlot>();
     handle.add_class::<EndTurnButton>();
+    handle.add_class::<SignalManager>();
+    handle.add_class::<TextBox>();
 }
 
 // Macro that creates the entry-points of the dynamic library.

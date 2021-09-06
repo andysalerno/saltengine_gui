@@ -14,10 +14,8 @@ use gdnative::api::{Area, Camera};
 use gdnative::prelude::*;
 use godot_log::GodotLog;
 use log::{error, info, warn};
-use salt_engine::cards::UnitCardDefinition;
 use salt_engine::game_logic::{AddCardToHandClientEvent, ClientEventView};
 use salt_engine::game_runner::GameClient;
-use salt_engine::game_state::{MakePlayerView, PlayerId, UnitCardInstanceId};
 use salt_engine::{
     cards::UnitCardDefinitionView,
     game_state::{GameStatePlayerView, HandView, UnitCardInstancePlayerView},
@@ -196,26 +194,12 @@ impl World {
     }
 
     #[export]
-    fn on_end_turn_clicked(&self, owner: TRef<Node>) {
+    fn on_end_turn_clicked(&self, _owner: TRef<Node>) {
         info!("The world sees taht end turn was clicked.");
+        self.message_channel
+            .send_blocking(FromGui::EndTurnAction)
+            .unwrap();
     }
-
-    // #[export]
-    // fn on_card_added_to_hand(&self, owner: TRef<Node>, card_added_path: Variant) {
-    //     let card_added_path = card_added_path.to_node_path();
-    //     info!(
-    //         "World observed signal card added to player hand: {:?}",
-    //         card_added_path
-    //     );
-
-    //     let card_added = owner
-    //         .get_node(card_added_path)
-    //         .expect("Did not find card added at given path.");
-
-    //     let card_added = unsafe { card_added.assume_safe() };
-
-    //     // card_added.con
-    // }
 
     fn connect_boardslot_signals(&self, owner: TRef<Node>) {
         info!("Looking for boardslot children of {:?}", owner.get_path());
@@ -285,11 +269,6 @@ impl World {
         }
     }
 
-    #[export]
-    fn my_method(&self, _owner: TRef<Node>) {
-        info!("Invoked my_method.");
-    }
-
     /// Invoked by a signal whenever a boardslot has a "click release" action.
     /// If there's currently a "dragged card" active, this means the player
     /// is attempting to summon the dragged card to the given boardslot.
@@ -320,30 +299,6 @@ impl World {
             let mouse_pos = mouse_pos_2d.to_vector2();
             if let Some(slot_path) = self.find_overlapping_boardslot(owner, mouse_pos) {
                 self.state.card_to_summon = Some((slot_path, dragged_card_path));
-
-                // Try to get the card ref...
-                // let card_inst = self
-                //     .card_instance(&card_in_hand_path, owner)
-                //     .expect("Could not find card instance.");
-
-                // info!("using map to do the thing........");
-                // card_inst
-                //     .map(|a, b| {
-                //         info!("Saw card with ID {}", a.title());
-                //     })
-                //     .unwrap();
-
-                // let card_inst = card_inst.script();
-
-                // info!("Guid is attempting to summon card from hand with ID {}", id);
-
-                // self.message_channel
-                //     .send_blocking(FromGui::SummonFromHandToSlotRequest {
-                //         slot_path,
-                //         card_in_hand_path,
-                //     })
-                //     .expect("Failed to send request from guid to network thread.");
-                // info!("User released card over boardslot {:?}", path);
             } else {
                 info!("User released card, but not over a boardslot.");
             }

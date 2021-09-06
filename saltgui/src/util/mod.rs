@@ -1,8 +1,12 @@
 mod godot_extensions;
 
-use std::ops::Deref;
+use std::ops::{Deref, Sub};
 
-use gdnative::prelude::*;
+use gdnative::{
+    object::{AssumeSafeLifetime, LifetimeConstraint},
+    prelude::*,
+    ref_kind::RefKind,
+};
 use log::info;
 
 use crate::SignalName;
@@ -28,30 +32,6 @@ where
     instance.try_cast::<TRoot>().unwrap()
 }
 
-pub(crate) fn connect_signalz<T: SubClass<Node>>(
-    from: &impl SubClass<Node>,
-    signal: SignalName,
-    target: TRef<T>,
-    target_method: impl Into<GodotString>,
-) {
-    let object = from.upcast::<Node>();
-    let target = target.upcast::<Node>();
-
-    let target_method = target_method.into();
-
-    object
-        .connect(signal, target, target_method, VariantArray::new_shared(), 0)
-        .expect("Failed binding signal");
-
-    // info!(
-    //     "Bound signal {} from {:?} to {:?}:{}",
-    //     signal,
-    //     object.get_path(),
-    //     target.get_path(),
-    //     target_method.to_string()
-    // );
-}
-
 pub(crate) fn connect_signal<U: SubClass<Node>>(
     from: impl Deref<Target = U>,
     signal: SignalName,
@@ -64,4 +44,51 @@ pub(crate) fn connect_signal<U: SubClass<Node>>(
 
     node.connect(signal, target, target_method, VariantArray::new_shared(), 0)
         .expect("Failed binding signal");
+}
+
+pub(crate) struct NodeRef<T>
+where
+    T: GodotObject<RefKind = ManuallyManaged> + SubClass<Node>,
+{
+    _phantom: std::marker::PhantomData<T>,
+    reference: Ref<Node>,
+    path: String,
+}
+
+impl<T> NodeRef<T>
+where
+    T: GodotObject<RefKind = ManuallyManaged> + SubClass<Node>,
+{
+    // pub fn from_parent(path: String, parent: &Node) -> Self {
+    //     let child = parent.get_node("hi").unwrap();
+
+    //     Self::from_existing(path, child)
+    // }
+
+    pub fn from_parent(path: impl AsRef<str>, parent: &impl SubClass<Node>) -> Self {
+        let x = parent.upcast::<Node>();
+        let child = x.get_node(path.as_ref()).unwrap();
+
+        Self::from_existing(path, child)
+    }
+
+    pub fn from_existing(path: impl AsRef<str>, reference: Ref<Node>) -> Self {
+        Self {
+            _phantom: std::marker::PhantomData::default(),
+            reference,
+            path: path.as_ref().to_string(),
+        }
+    }
+
+    pub fn resolve(&self) -> TRef<T> {
+        let r = unsafe { self.reference.assume_safe() };
+        let r = r.cast::<T>().unwrap();
+        r
+    }
+
+    pub fn resolve_ref(&self) -> &T {
+        let r = unsafe { self.reference.assume_safe() };
+        let r = r.cast::<T>().unwrap();
+        r.as_ref()
+    }
 }

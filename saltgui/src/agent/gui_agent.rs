@@ -37,24 +37,17 @@ impl GameClient for GuiClient {
     ) -> ClientActionEvent {
         info!("next_action invoked on GuiClient. Waiting for message from godot...");
 
-        let FromGui::SummonFromHandToSlotRequest {
-            slot_path,
-            card_instance_id,
-        } = self.channel.recv().await.unwrap();
-
-        info!(
-            "From GUI to client: summon card id {} to path {}",
-            card_instance_id, slot_path
-        );
-
-        let e = SummonCreatureFromHandEvent::new(
-            self.id(),
-            BoardPos::new(self.id(), RowId::BackRow, 0),
-            card_instance_id,
-        );
-
-        //ClientActionEvent::EndTurn(EndTurnEvent)
-        ClientActionEvent::SummonCreatureFromHand(e)
+        match self.channel.recv().await.unwrap() {
+            FromGui::SummonFromHandToSlotRequest {
+                slot_path,
+                card_instance_id,
+            } => ClientActionEvent::SummonCreatureFromHand(SummonCreatureFromHandEvent::new(
+                self.id(),
+                BoardPos::new(self.id(), RowId::BackRow, 0),
+                card_instance_id,
+            )),
+            FromGui::EndTurnAction => ClientActionEvent::EndTurn(EndTurnEvent),
+        }
     }
 
     async fn make_prompter(&self) -> Box<dyn salt_engine::game_agent::Prompter> {

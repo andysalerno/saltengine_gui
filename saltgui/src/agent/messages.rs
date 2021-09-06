@@ -1,4 +1,3 @@
-use gdnative::core_types::NodePath;
 use salt_engine::{
     game_logic::ClientEventView,
     game_state::{GameStatePlayerView, UnitCardInstanceId},
@@ -16,4 +15,5 @@ pub(crate) enum FromGui {
         slot_path: String,
         card_instance_id: UnitCardInstanceId,
     },
+    EndTurnAction,
 }
