@@ -74,15 +74,14 @@ impl World {
         }
     }
 
+    /// Observe and react to an event sent to us from the server.
     fn observe_notifier_event(&self, event: ClientEventView, owner: TRef<Node>) {
         info!("Gui observes event: {:?}", event);
 
         match event {
             ClientEventView::AddCardToHand(e) => self.add_card_to_hand(e, owner),
-            ClientEventView::UnitSet(e) => self.summon_card_on_boardslot(e, owner),
-            ClientEventView::SummonCreatureFromHand(_) => {
-                info!("Looks like the other player summoned something");
-            }
+            ClientEventView::UnitSet(e) => self.update_from_creature_set_event(e, owner),
+            ClientEventView::SummonCreatureFromHand(_) => {}
         }
     }
 
@@ -93,7 +92,7 @@ impl World {
         }
     }
 
-    fn summon_card_on_boardslot(&self, event: CreatureSetClientEvent, owner: TRef<Node>) {
+    fn update_from_creature_set_event(&self, event: CreatureSetClientEvent, owner: TRef<Node>) {
         info!("World saw a summon event.");
         let slot_pos = SlotPos {
             row_id: event.pos.row_id,
@@ -106,8 +105,6 @@ impl World {
             BOARD_PATH_RELATIVE, BOARD_SLOT_PATH_PREFIX, slot_index
         );
         let slot: NodeRef<BoardSlot> = NodeRef::from_parent_ref(&slot_path, owner);
-
-        info!("Sending summon request to slot: {}", slot_path);
 
         let slot = slot.resolve_instance();
         slot.map_mut(|a, _| a.receive_summon(event))
@@ -152,6 +149,7 @@ impl World {
         unsafe { owner.as_ref().get_node_as::<Camera>("Camera") }
     }
 
+    /// Given a `SlotPos`, returns its corresponding board slot number.
     fn boardslot_from_pos(&self, _owner: TRef<Node>, pos: SlotPos) -> usize {
         let row_len = BOARD_SLOT_COUNT / 4;
 
@@ -196,9 +194,7 @@ impl World {
         self.connect_boardslot_signals(owner);
         self.connect_hand_card_dragged(owner);
         self.connect_end_turn_clicked(owner);
-        self.set_board_slot_pos(owner);
-
-        // self.add_card_to_hand(owner);
+        self.init_board_slot_pos(owner);
     }
 
     fn add_card_to_hand(&self, event: AddCardToHandClientEvent, owner: TRef<Node>) {
@@ -209,7 +205,7 @@ impl World {
         hand.add_card(&event.card);
     }
 
-    fn set_board_slot_pos(&self, owner: TRef<Node>) {
+    fn init_board_slot_pos(&self, owner: TRef<Node>) {
         let row_len = BOARD_SLOT_COUNT / 4;
 
         // Opponent back
@@ -371,6 +367,12 @@ impl World {
                     card_instance_id,
                 })
                 .expect("Failed to send request from guid to network thread.");
+
+            let hand_card: NodeRef<CardInstance> =
+                NodeRef::from_parent_ref(card_path.to_string(), owner);
+
+            let hand_card = hand_card.resolve_instance();
+            hand_card.base().queue_free();
         }
 
         let message = match self.message_channel.try_recv() {
