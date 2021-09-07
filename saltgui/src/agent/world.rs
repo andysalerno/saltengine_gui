@@ -3,37 +3,33 @@ use super::messages::ToGui;
 use crate::agent::bi_channel::create_channel;
 use crate::agent::gui_agent::GuiClient;
 use crate::agent::messages::FromGui;
-use crate::board_slot::{BoardSlot, CLICK_RELEASED_SIGNAL};
+use crate::board_slot::{BoardSlot, SlotPos, CLICK_RELEASED_SIGNAL};
 use crate::card_instance::CardInstance;
 use crate::end_turn_button::{EndTurnButton, END_TURN_CLICKED_SIGNAL};
-use crate::hand::{Hand, PLAYER_HAND_CARD_ADDED_SIGNAL, PLAYER_HAND_CARD_DRAGGED};
+use crate::hand::{Hand, PLAYER_HAND_CARD_DRAGGED};
 use crate::util::NodeRef;
 use crate::{hand::HandRef, util};
-use cards::RicketyCannon;
 use gdnative::api::utils::NodeExt;
 use gdnative::api::{Area, Camera};
 use gdnative::prelude::*;
 use godot_log::GodotLog;
-use log::{error, info, warn};
+use log::{info, warn};
 use salt_engine::game_logic::events::{
-    AddCardToHandClientEvent, ClientEventView, SummonCreatureFromHandClientEvent,
+    AddCardToHandClientEvent, ClientEventView, CreatureSetClientEvent,
 };
 use salt_engine::game_runner::GameClient;
-use salt_engine::game_state::board::BoardPos;
+use salt_engine::game_state::board::RowId;
+use salt_engine::game_state::GameStatePlayerView;
 use salt_engine::game_state::PlayerId;
-use salt_engine::{
-    cards::UnitCardDefinitionView,
-    game_state::{GameStatePlayerView, HandView, UnitCardInstancePlayerView},
-};
 use smol::channel::TryRecvError;
 use std::thread::JoinHandle;
 
-const CREATURE_INSTANCE_SCENE: &str = "res://card/creature_instance.tscn";
+const _CREATURE_INSTANCE_SCENE: &str = "res://card/creature_instance.tscn";
 const BOARD_SLOT_COUNT: usize = 24;
 const BOARD_SLOT_PATH_PREFIX: &str = "BoardSlot";
 const BOARD_PATH_RELATIVE: &str = "Board";
 const PLAYER_HAND_PATH_RELATIVE: &str = "PlayerHand";
-const PLAYER_HAND_NAME: &str = "PlayerHand";
+const _PLAYER_HAND_NAME: &str = "PlayerHand";
 const END_TURN_BUTTON: &str = "EndTurnButton";
 
 #[derive(NativeClass)]
@@ -47,8 +43,9 @@ pub struct World {
 #[derive(Debug, Default)]
 struct WorldState {
     player_id: Option<PlayerId>,
+    opponent_id: Option<PlayerId>,
     dragging_hand_card: Option<NodePath>,
-    card_to_summon: Option<(NodePath, NodePath)>,
+    card_to_summon: Option<(NodeRef<BoardSlot>, NodePath)>,
 }
 
 impl World {
@@ -82,32 +79,28 @@ impl World {
 
         match event {
             ClientEventView::AddCardToHand(e) => self.add_card_to_hand(e, owner),
-            ClientEventView::SummonCreatureFromHand(e) => {
-                self.summon_card_on_boardslot(e, owner);
+            ClientEventView::UnitSet(e) => self.summon_card_on_boardslot(e, owner),
+            ClientEventView::SummonCreatureFromHand(_) => {
                 info!("Looks like the other player summoned something");
             }
         }
     }
 
-    fn update_from_state(&self, state: GameStatePlayerView, owner: TRef<Node>) {
-        // info!("Updating from state.");
-        // let hand_ref = owner.get_node(PLAYER_HAND_NAME).unwrap();
-        // let hand_ref = unsafe { hand_ref.assume_safe() };
-        // let hand_ref = hand_ref.cast::<Spatial>().unwrap();
-        // let mut hand_ref = HandRef::new(hand_ref);
-        // for hand_card in state.hand().cards() {
-        //     info!("iterating over hand_card...");
-        //     hand_ref.add_card(hand_card);
-        // }
+    fn update_from_state(&mut self, state: GameStatePlayerView, _owner: TRef<Node>) {
+        if self.state.opponent_id.is_none() {
+            self.state.opponent_id = Some(state.opponent_id());
+            info!("My opponent is: {:?}", state.opponent_id());
+        }
     }
 
-    fn summon_card_on_boardslot(
-        &self,
-        event: SummonCreatureFromHandClientEvent,
-        owner: TRef<Node>,
-    ) {
+    fn summon_card_on_boardslot(&self, event: CreatureSetClientEvent, owner: TRef<Node>) {
         info!("World saw a summon event.");
-        let slot_index = self.boardslot_from_pos(owner, event.board_pos);
+        let slot_pos = SlotPos {
+            row_id: event.pos.row_id,
+            is_friendly: event.pos.player_id == self.state.player_id.unwrap(),
+            index: event.pos.row_index,
+        };
+        let slot_index = self.boardslot_from_pos(owner, slot_pos);
         let slot_path = format!(
             "{}/{}{}",
             BOARD_PATH_RELATIVE, BOARD_SLOT_PATH_PREFIX, slot_index
@@ -117,7 +110,7 @@ impl World {
         info!("Sending summon request to slot: {}", slot_path);
 
         let slot = slot.resolve_instance();
-        slot.map_mut(|a, b| a.receive_summon(event))
+        slot.map_mut(|a, _| a.receive_summon(event))
             .expect("Failed to receive summon for slot");
     }
 
@@ -159,10 +152,10 @@ impl World {
         unsafe { owner.as_ref().get_node_as::<Camera>("Camera") }
     }
 
-    fn boardslot_from_pos(&self, _owner: TRef<Node>, pos: BoardPos) -> usize {
+    fn boardslot_from_pos(&self, _owner: TRef<Node>, pos: SlotPos) -> usize {
         let row_len = BOARD_SLOT_COUNT / 4;
 
-        let offset = if pos.player_id == self.state.player_id.expect("Player ID not yet set.") {
+        let offset = if pos.is_friendly {
             let player_offset = row_len * 2;
 
             let row_offset = match pos.row_id {
@@ -171,7 +164,7 @@ impl World {
                 salt_engine::game_state::board::RowId::Hero => todo!("hero not done yet"),
             };
 
-            let index_offset = pos.row_index;
+            let index_offset = pos.index;
 
             player_offset + row_offset + index_offset
         } else {
@@ -183,7 +176,7 @@ impl World {
                 salt_engine::game_state::board::RowId::Hero => todo!("hero not done yet"),
             };
 
-            let index_offset = pos.row_index;
+            let index_offset = pos.index;
 
             player_offset + row_offset + index_offset
         };
@@ -202,8 +195,8 @@ impl World {
 
         self.connect_boardslot_signals(owner);
         self.connect_hand_card_dragged(owner);
-        self.connect_hand_card_added(owner);
         self.connect_end_turn_clicked(owner);
+        self.set_board_slot_pos(owner);
 
         // self.add_card_to_hand(owner);
     }
@@ -216,15 +209,88 @@ impl World {
         hand.add_card(&event.card);
     }
 
-    fn connect_hand_card_added(&self, owner: TRef<Node>) {
-        // let hand = self.player_hand(owner).unwrap();
+    fn set_board_slot_pos(&self, owner: TRef<Node>) {
+        let row_len = BOARD_SLOT_COUNT / 4;
 
-        // util::connect_signal(
-        //     &*hand.base(),
-        //     PLAYER_HAND_CARD_ADDED_SIGNAL,
-        //     owner,
-        //     "on_card_added_to_hand",
-        // );
+        // Opponent back
+        for i in 0..row_len {
+            let pos = SlotPos {
+                index: i,
+                row_id: RowId::BackRow,
+                is_friendly: false,
+            };
+            let slot_index = self.boardslot_from_pos(owner, pos);
+            let slot_path = format!(
+                "{}/{}{}",
+                BOARD_PATH_RELATIVE, BOARD_SLOT_PATH_PREFIX, slot_index
+            );
+            let slot: NodeRef<BoardSlot> = NodeRef::from_parent_ref(&slot_path, owner);
+            let slot = slot.resolve_instance();
+            slot.map_mut(|a, _| {
+                a.set_pos(pos);
+            })
+            .unwrap();
+        }
+
+        // Opponent front
+        for i in 0..row_len {
+            let pos = SlotPos {
+                index: i,
+                row_id: RowId::FrontRow,
+                is_friendly: false,
+            };
+            let slot_index = self.boardslot_from_pos(owner, pos);
+            let slot_path = format!(
+                "{}/{}{}",
+                BOARD_PATH_RELATIVE, BOARD_SLOT_PATH_PREFIX, slot_index
+            );
+            let slot: NodeRef<BoardSlot> = NodeRef::from_parent_ref(&slot_path, owner);
+            let slot = slot.resolve_instance();
+            slot.map_mut(|a, _| {
+                a.set_pos(pos);
+            })
+            .unwrap();
+        }
+
+        // Player front
+        for i in 0..row_len {
+            let pos = SlotPos {
+                index: i,
+                row_id: RowId::FrontRow,
+                is_friendly: true,
+            };
+            let slot_index = self.boardslot_from_pos(owner, pos);
+            let slot_path = format!(
+                "{}/{}{}",
+                BOARD_PATH_RELATIVE, BOARD_SLOT_PATH_PREFIX, slot_index
+            );
+            let slot: NodeRef<BoardSlot> = NodeRef::from_parent_ref(&slot_path, owner);
+            let slot = slot.resolve_instance();
+            slot.map_mut(|a, _| {
+                a.set_pos(pos);
+            })
+            .unwrap();
+        }
+
+        // Player back
+        for i in 0..row_len {
+            let pos = SlotPos {
+                index: i,
+                row_id: RowId::BackRow,
+                is_friendly: true,
+            };
+            let slot_index = self.boardslot_from_pos(owner, pos);
+            let slot_path = format!(
+                "{}/{}{}",
+                BOARD_PATH_RELATIVE, BOARD_SLOT_PATH_PREFIX, slot_index
+            );
+            let slot: NodeRef<BoardSlot> = NodeRef::from_parent_ref(&slot_path, owner);
+            let slot = slot.resolve_instance();
+            slot.map_mut(|a, _| {
+                a.set_pos(pos);
+            })
+            .unwrap();
+        }
     }
 
     fn connect_end_turn_clicked(&self, owner: TRef<Node>) {
@@ -295,11 +361,13 @@ impl World {
 
             info!("using map to do the thing........");
             let card_instance_id = card_inst.map(|a, _| a.expect_view().id()).unwrap();
-            let slot_path = slot_path.to_string();
+
+            let slot_pos = slot_path.resolve_instance().map(|a, b| a.pos()).unwrap();
+            let board_pos = slot_pos.into_board_slot(self.state.player_id.unwrap());
 
             self.message_channel
                 .send_blocking(FromGui::SummonFromHandToSlotRequest {
-                    slot_path,
+                    board_pos,
                     card_instance_id,
                 })
                 .expect("Failed to send request from guid to network thread.");
@@ -361,7 +429,7 @@ impl World {
         &self,
         owner: TRef<Node>,
         mouse_pos: Vector2,
-    ) -> Option<NodePath> {
+    ) -> Option<NodeRef<BoardSlot>> {
         // Cast ray from the moust position to the BoardSlot layer.
         let camera = self.camera(owner).unwrap();
 
@@ -391,7 +459,13 @@ impl World {
                 let area = unsafe { area.assume_safe() };
                 let parent = area.get_parent().unwrap();
                 let parent = unsafe { parent.assume_safe() };
-                parent.get_path()
+                let parent_path = parent.get_path();
+
+                info!("NodeRef creating from path: {:?}", parent_path);
+
+                let node_ref: NodeRef<BoardSlot> =
+                    NodeRef::from_parent_ref(parent_path.to_string(), owner);
+                node_ref
             })
     }
 }

@@ -6,14 +6,20 @@ use crate::{
 use gdnative::{api::InputEventMouseButton, prelude::*};
 use log::info;
 use salt_engine::{
-    game_logic::events::SummonCreatureFromHandClientEvent, game_state::UnitCardInstancePlayerView,
+    cards::UnitCardDefinitionView,
+    game_logic::events::CreatureSetClientEvent,
+    game_state::{
+        board::{BoardPos, RowId},
+        PlayerId, UnitCardInstancePlayerView,
+    },
 };
 
-#[derive(NativeClass)]
+#[derive(NativeClass, Debug)]
 #[register_with(Self::register)]
 #[inherit(Spatial)]
 pub struct BoardSlot {
     textbox: Option<NodeRef<TextBox>>,
+    board_pos: Option<SlotPos>,
 }
 
 /// Emitted when a click is released over this `BoardSlot`.
@@ -22,21 +28,52 @@ pub(crate) const CLICK_RELEASED_SIGNAL: SignalName = SignalName("click_released"
 /// Internal signal from Godot emitted when there is an input event.
 pub(crate) const INPUT_EVENT_SIGNAL: SignalName = SignalName("input_event");
 
-impl BoardSlot {
-    fn new(_owner: &Spatial) -> Self {
-        Self { textbox: None }
+/// Just like `BoardSlot`, except agnostic to the player's ID.
+#[derive(Debug, Copy, Clone)]
+pub struct SlotPos {
+    pub is_friendly: bool,
+    pub row_id: RowId,
+    pub index: usize,
+}
+
+impl SlotPos {
+    pub fn into_board_slot(self, player_id: PlayerId) -> BoardPos {
+        BoardPos::new(player_id, self.row_id, self.index)
     }
 }
 
 impl BoardSlot {
-    // pub fn receive_summon(&self, card_view: UnitCardInstancePlayerView) {
-    pub fn receive_summon(&self, card_view: SummonCreatureFromHandClientEvent) {
+    fn new(_owner: &Spatial) -> Self {
+        Self {
+            textbox: None,
+            board_pos: None,
+        }
+    }
+}
+
+impl BoardSlot {
+    pub fn receive_summon(&self, card_view: CreatureSetClientEvent) {
+        let title = card_view.card.definition().title();
+        let attack = card_view.card.attack();
+        let health = card_view.card.health();
+
+        let text = format!("{}\n{}/{}", title, attack, health);
+
         let textbox = self.textbox.as_ref().unwrap().resolve_instance();
         textbox
-            .map_mut(|b, a| {
-                b.set_text("I got a summon!!");
+            .map_mut(|i, _| {
+                i.set_text(&text);
             })
             .unwrap();
+    }
+
+    pub fn set_pos(&mut self, pos: SlotPos) {
+        info!("Looks like my pos is: {:?}", pos);
+        self.board_pos = Some(pos);
+    }
+
+    pub fn pos(&self) -> SlotPos {
+        self.board_pos.unwrap()
     }
 }
 
@@ -55,10 +92,6 @@ impl BoardSlot {
             let r: NodeRef<TextBox> = NodeRef::from_existing("TextBox", text_box);
             self.textbox = Some(r);
         }
-
-        // self.textbox.and_then(|t| {
-        //     let i = t.resolve_instance();
-        // });
     }
 
     #[export]

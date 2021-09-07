@@ -1,6 +1,6 @@
 use salt_engine::{
     game_logic::events::ClientEventView,
-    game_state::{GameStatePlayerView, PlayerId, UnitCardInstanceId},
+    game_state::{board::BoardPos, GameStatePlayerView, PlayerId, UnitCardInstanceId},
 };
 
 #[derive(Debug, Clone)]
@@ -13,7 +13,7 @@ pub(crate) enum ToGui {
 #[derive(Debug, Clone)]
 pub(crate) enum FromGui {
     SummonFromHandToSlotRequest {
-        slot_path: String,
+        board_pos: BoardPos,
         card_instance_id: UnitCardInstanceId,
     },
     EndTurnAction,

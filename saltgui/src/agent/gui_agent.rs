@@ -21,7 +21,9 @@ pub(crate) struct GuiClient {
 
 impl GuiClient {
     pub fn new_with_id(channel: BiChannel<ToGui, FromGui>, player_id: PlayerId) -> Self {
-        channel.send_blocking(ToGui::PlayerIdSet(player_id));
+        channel
+            .send_blocking(ToGui::PlayerIdSet(player_id))
+            .unwrap();
         Self { player_id, channel }
     }
 
@@ -40,11 +42,11 @@ impl GameClient for GuiClient {
 
         match self.channel.recv().await.unwrap() {
             FromGui::SummonFromHandToSlotRequest {
-                slot_path,
+                board_pos,
                 card_instance_id,
             } => ClientActionEvent::SummonCreatureFromHand(SummonCreatureFromHandEvent::new(
                 self.id(),
-                BoardPos::new(self.id(), RowId::BackRow, 0),
+                board_pos,
                 card_instance_id,
             )),
             FromGui::EndTurnAction => ClientActionEvent::EndTurn(EndTurnEvent),
@@ -61,7 +63,7 @@ impl GameClient for GuiClient {
     ) {
         info!("GuiClient::observe_state_update()");
         let message = ToGui::StateUpdate(game_state);
-        self.channel.send_blocking(message).unwrap();
+        self.channel.send(message).await.unwrap();
     }
 
     async fn make_notifier(&self) -> Box<dyn salt_engine::game_agent::ClientNotifier> {

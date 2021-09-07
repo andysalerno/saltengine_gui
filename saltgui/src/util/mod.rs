@@ -46,6 +46,7 @@ pub(crate) fn connect_signal<U: SubClass<Node>>(
         .expect("Failed binding signal");
 }
 
+#[derive(Debug)]
 pub(crate) struct NodeRef<T> {
     _phantom: std::marker::PhantomData<T>,
     reference: Ref<Node>,

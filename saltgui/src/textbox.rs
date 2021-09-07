@@ -1,17 +1,9 @@
-use crate::{
-    board_slot::INPUT_EVENT_SIGNAL,
-    util::{self, NodeRef},
-    SignalName,
-};
-use gdnative::{
-    api::{InputEventMouseButton, RichTextLabel},
-    prelude::*,
-};
-use log::info;
+use crate::util::NodeRef;
+use gdnative::{api::RichTextLabel, prelude::*};
 
 const LABEL_PATH: &str = "Viewport/GUI/Panel/RichTextLabel";
 
-#[derive(NativeClass)]
+#[derive(NativeClass, Debug)]
 #[register_with(Self::register)]
 #[inherit(Spatial)]
 pub struct TextBox {
@@ -31,8 +23,6 @@ impl TextBox {
         let r: NodeRef<RichTextLabel> = NodeRef::from_parent(LABEL_PATH, owner.as_ref());
 
         self.textbox = Some(r);
-
-        self.set_text("(empty)");
     }
 
     pub fn set_text(&self, text: &str) {
