@@ -8,10 +8,7 @@ use log::info;
 use salt_engine::{
     game_logic::events::{ClientActionEvent, EndTurnEvent, SummonCreatureFromHandEvent},
     game_runner::GameClient,
-    game_state::{
-        board::{BoardPos, RowId},
-        PlayerId,
-    },
+    game_state::PlayerId,
 };
 
 pub(crate) struct GuiClient {

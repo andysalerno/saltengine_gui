@@ -1,16 +1,10 @@
 mod godot_extensions;
 
-use std::ops::{Deref, Sub};
-
-use gdnative::{
-    object::{AssumeSafeLifetime, LifetimeConstraint},
-    prelude::*,
-    ref_kind::RefKind,
-};
-use log::info;
-
 use crate::SignalName;
+use gdnative::prelude::*;
+use std::ops::Deref;
 
+/// Load a scene.
 pub(crate) fn load_scene(path: &str) -> Option<Ref<PackedScene, ThreadLocal>> {
     let scene = ResourceLoader::godot_singleton().load(path, "PackedScene", false)?;
 
@@ -19,6 +13,7 @@ pub(crate) fn load_scene(path: &str) -> Option<Ref<PackedScene, ThreadLocal>> {
     scene.cast::<PackedScene>()
 }
 
+/// Instance a scene.
 pub(crate) fn instance_scene<TRoot>(scene: &PackedScene) -> Ref<TRoot, Unique>
 where
     TRoot: gdnative::GodotObject<RefKind = ManuallyManaged> + SubClass<Node>,
@@ -32,6 +27,7 @@ where
     instance.try_cast::<TRoot>().unwrap()
 }
 
+/// Connect a node to a signal on another node.
 pub(crate) fn connect_signal<U: SubClass<Node>>(
     from: impl Deref<Target = U>,
     signal: SignalName,
@@ -46,6 +42,8 @@ pub(crate) fn connect_signal<U: SubClass<Node>>(
         .expect("Failed binding signal");
 }
 
+/// A longer-lived reference to a Godot Node object.
+/// Can be resolved to a custom (`NativeClass`) script or a Godot object.
 #[derive(Debug)]
 pub(crate) struct NodeRef<T> {
     _phantom: std::marker::PhantomData<T>,
@@ -55,22 +53,8 @@ pub(crate) struct NodeRef<T> {
 
 impl<T> NodeRef<T>
 where
-    // T: GodotObject<RefKind = ManuallyManaged> + SubClass<Node>,
     T: SubClass<Node>,
 {
-    // pub fn from_parent(path: String, parent: &Node) -> Self {
-    //     let child = parent.get_node("hi").unwrap();
-
-    //     Self::from_existing(path, child)
-    // }
-
-    // pub fn from_parentz(path: impl AsRef<str>, parent: Ref<impl SubClass<Node>>) -> Self {
-    //     //let x = parent.upcast::<Node>();
-    //     let child = parent.get_node(path.as_ref()).unwrap();
-
-    //     Self::from_existing(path, child)
-    // }
-
     pub fn from_parent(path: impl AsRef<str>, parent: &impl SubClass<Node>) -> Self {
         let x = parent.upcast::<Node>();
         let child = x.get_node(path.as_ref()).unwrap();
@@ -103,7 +87,6 @@ impl<T> NodeRef<T> {
 
 impl<T> NodeRef<T>
 where
-    // T: NativeClass<Base = Node>,
     T: NativeClass<Base = Spatial>,
 {
     pub fn from_parent_ref(path: impl AsRef<str>, parent: TRef<Node>) -> Self {

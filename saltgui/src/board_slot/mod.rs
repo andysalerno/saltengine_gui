@@ -10,7 +10,7 @@ use salt_engine::{
     game_logic::events::CreatureSetClientEvent,
     game_state::{
         board::{BoardPos, RowId},
-        PlayerId, UnitCardInstancePlayerView,
+        PlayerId,
     },
 };
 

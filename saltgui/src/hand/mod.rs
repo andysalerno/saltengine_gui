@@ -1,12 +1,10 @@
-use gdnative::prelude::*;
-
-use log::info;
-use salt_engine::{cards::UnitCardDefinitionView, game_state::UnitCardInstancePlayerView};
-
 use crate::{
     card_instance::{CardInstance, CARD_DRAGGED},
     util, SignalName,
 };
+use gdnative::prelude::*;
+use log::info;
+use salt_engine::{cards::UnitCardDefinitionView, game_state::UnitCardInstancePlayerView};
 
 const OFFSET_DIST_MULTIPLIER: f32 = 1.75;
 pub(crate) const PLAYER_HAND_CARD_ADDED_SIGNAL: SignalName =
@@ -137,41 +135,9 @@ impl<'a> HandRef<'a> {
         let card_instance = unsafe { card_instance.assume_safe() };
         let card_path = card_instance.get_path();
 
-        // what happens if we try getting it now?
-
-        // try doing it after adding to scene??
-        // let card_instance = card_instance
-        //     .cast_instance::<CardInstance>()
-        //     .expect("Could not cast to CardInstance.");
-
-        //card_instance.map(|a, b| {});
-        // let card_cloned = card.clone();
-        // let node_cloned = self.node;
-
-        // card_instance
-        //     .map_mut(move |c, n| {
-        //         info!("Start card_instance map_mut.");
-        //         let def = card_cloned.definition();
-        //         c.set_title(def.title());
-        //         c.set_body(def.text());
-
-        //         // c.set_view(card.clone());
-
-        //         n.translate(Vector3::new(offset, 0., 0.));
-
-        //         util::connect_signal(n, CARD_DRAGGED, node_cloned, "on_card_dragged");
-        //         info!("Done mapping signal in card instance map_mut.");
-        //     })
-        //     .unwrap();
-
         self.node
             .emit_signal(PLAYER_HAND_CARD_ADDED_SIGNAL, &[card_path.to_variant()]);
 
         info!("Added card {:?} to PlayerHand.", card_path);
     }
-
-    // fn center_hand(&self) {
-    //     let current_width = self.node.
-    //     let current_midpoint = self.node.translation().x;
-    // }
 }

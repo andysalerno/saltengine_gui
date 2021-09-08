@@ -1,5 +1,5 @@
 use gdnative::godot_print;
-use log::{debug, info, trace, LevelFilter, Log};
+use log::{info, LevelFilter, Log};
 
 pub struct GodotLog;
 

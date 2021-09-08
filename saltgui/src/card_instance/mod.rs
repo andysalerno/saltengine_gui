@@ -1,9 +1,8 @@
+use crate::{util, SignalName};
 use gdnative::api::InputEventMouseButton;
 use gdnative::prelude::*;
 use log::info;
 use salt_engine::game_state::UnitCardInstancePlayerView;
-
-use crate::{util, SignalName};
 
 const CARD_INSTANCE_SCENE: &str = "res://card/creature_instance.tscn";
 const BODY_TEXT_LABEL: &str = "CardBodyText/Viewport/GUI/Panel/RichTextLabel";
