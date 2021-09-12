@@ -1,4 +1,9 @@
-use crate::{board_slot::INPUT_EVENT_SIGNAL, util, SignalName};
+use crate::{
+    board_slot::INPUT_EVENT_SIGNAL,
+    textbox::TextBox,
+    util::{self, NodeRef},
+    SignalName,
+};
 use gdnative::{api::InputEventMouseButton, prelude::*};
 use log::info;
 
@@ -7,19 +12,34 @@ pub(crate) const END_TURN_CLICKED_SIGNAL: SignalName = SignalName("end_turn_clic
 #[derive(NativeClass)]
 #[register_with(Self::register)]
 #[inherit(Spatial)]
-pub struct EndTurnButton {}
+pub struct EndTurnButton {
+    text_box: NodeRef<TextBox>,
+}
 
 impl EndTurnButton {
     fn new(_owner: &Spatial) -> Self {
-        Self {}
+        Self {
+            text_box: NodeRef::<TextBox>::from_path("TextBox"),
+        }
+    }
+
+    fn set_text(&self) {
+        self.text_box
+            .resolve_instance()
+            .map_mut(|t, _| {
+                t.set_text("hello");
+            })
+            .expect("Could not set text on EndTurnButton textbox");
     }
 }
 
 #[methods]
 impl EndTurnButton {
     #[export]
-    fn _ready(&self, owner: TRef<Spatial>) {
+    fn _ready(&mut self, owner: TRef<Spatial>) {
         info!("End turn button initialized.");
+
+        self.text_box.init_from_parent_ref(owner);
 
         let mouse_collider = owner.get_node("StaticBody").unwrap();
         let mouse_collider = unsafe { mouse_collider.assume_safe_if_sane().unwrap() };

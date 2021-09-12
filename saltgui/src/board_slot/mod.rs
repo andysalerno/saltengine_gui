@@ -18,7 +18,7 @@ use salt_engine::{
 #[register_with(Self::register)]
 #[inherit(Spatial)]
 pub struct BoardSlot {
-    textbox: Option<NodeRef<TextBox>>,
+    textbox: NodeRef<TextBox>,
     board_pos: Option<SlotPos>,
 }
 
@@ -45,13 +45,11 @@ impl SlotPos {
 impl BoardSlot {
     fn new(_owner: &Spatial) -> Self {
         Self {
-            textbox: None,
+            textbox: NodeRef::from_path("TextBox"),
             board_pos: None,
         }
     }
-}
 
-impl BoardSlot {
     pub fn receive_summon(&self, card_view: CreatureSetClientEvent) {
         let title = card_view.card.definition().title();
         let attack = card_view.card.attack();
@@ -59,7 +57,7 @@ impl BoardSlot {
 
         let text = format!("{}\n{}/{}", title, attack, health);
 
-        let textbox = self.textbox.as_ref().unwrap().resolve_instance();
+        let textbox = self.textbox.resolve_instance();
         textbox
             .map_mut(|i, _| {
                 i.set_text(&text);
@@ -87,11 +85,7 @@ impl BoardSlot {
             util::connect_signal(&*mouse_collider, INPUT_EVENT_SIGNAL, owner, "input_event");
         }
 
-        {
-            let text_box = owner.get_node("TextBox").unwrap();
-            let r: NodeRef<TextBox> = NodeRef::from_existing("TextBox", text_box);
-            self.textbox = Some(r);
-        }
+        self.textbox.init_from_parent_ref(owner);
     }
 
     #[export]

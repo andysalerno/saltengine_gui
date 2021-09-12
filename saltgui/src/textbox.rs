@@ -1,5 +1,6 @@
 use crate::util::NodeRef;
 use gdnative::{api::RichTextLabel, prelude::*};
+use log::{info, warn};
 
 const LABEL_PATH: &str = "Viewport/GUI/Panel/RichTextLabel";
 
@@ -7,12 +8,16 @@ const LABEL_PATH: &str = "Viewport/GUI/Panel/RichTextLabel";
 #[register_with(Self::register)]
 #[inherit(Spatial)]
 pub struct TextBox {
-    textbox: Option<NodeRef<RichTextLabel>>,
+    textbox: NodeRef<RichTextLabel>,
+    is_ready: bool,
 }
 
 impl TextBox {
     fn new(_owner: &Spatial) -> Self {
-        Self { textbox: None }
+        Self {
+            textbox: NodeRef::from_path(LABEL_PATH),
+            is_ready: false,
+        }
     }
 }
 
@@ -20,26 +25,26 @@ impl TextBox {
 impl TextBox {
     #[export]
     fn _ready(&mut self, owner: TRef<Spatial>) {
-        let r: NodeRef<RichTextLabel> = NodeRef::from_parent(LABEL_PATH, owner.as_ref());
-
-        self.textbox = Some(r);
+        info!("Textbox ready start");
+        self.textbox.init_from_parent(owner);
+        info!("Textbox ready start end");
+        self.is_ready = true;
     }
 
     pub fn set_text(&self, text: &str) {
-        if let Some(textbox) = &self.textbox {
-            let x = textbox.resolve_ref();
-            x.set_text(text);
+        if self.is_ready {
+            self.textbox.resolve_ref().set_text(text);
+        } else {
+            warn!("set_text invoked when TextBox is not yet ready");
         }
     }
 
     pub fn get_text(&self) -> GodotString {
-        self.textbox.as_ref().map_or_else(
-            || String::new().into(),
-            |textbox| {
-                let x = textbox.resolve_ref();
-                x.text()
-            },
-        )
+        if self.is_ready {
+            self.textbox.resolve_ref().text()
+        } else {
+            "<TextBox not yet ready>".into()
+        }
     }
 
     fn register(builder: &ClassBuilder<Self>) {

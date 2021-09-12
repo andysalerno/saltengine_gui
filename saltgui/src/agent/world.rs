@@ -38,6 +38,7 @@ pub struct World {
     _network_thread: JoinHandle<()>,
     state: WorldState,
     message_channel: BiChannel<FromGui, ToGui>,
+    end_turn_button: NodeRef<EndTurnButton>,
 }
 
 #[derive(Debug, Default)]
@@ -71,6 +72,7 @@ impl World {
             _network_thread: handle,
             state: WorldState::default(),
             message_channel: gui_side_channel,
+            end_turn_button: NodeRef::<EndTurnButton>::from_path(END_TURN_BUTTON),
         }
     }
 
@@ -90,6 +92,14 @@ impl World {
             self.state.opponent_id = Some(state.opponent_id());
             info!("My opponent is: {:?}", state.opponent_id());
         }
+
+        if state.cur_player_turn() == state.player_id() {
+            info!("It's my turn!");
+        } else {
+            info!("It's the enemy's turn");
+        }
+
+        let button = self.end_turn_button.resolve_instance();
     }
 
     fn update_from_creature_set_event(&self, event: CreatureSetClientEvent, owner: TRef<Node>) {
@@ -187,7 +197,7 @@ impl World {
 #[methods]
 impl World {
     #[export]
-    fn _ready(&self, owner: TRef<Node>) {
+    fn _ready(&mut self, owner: TRef<Node>) {
         GodotLog::init();
         info!("World initialized.  Hello.");
 
@@ -195,6 +205,8 @@ impl World {
         self.connect_hand_card_dragged(owner);
         self.connect_end_turn_clicked(owner);
         self.init_board_slot_pos(owner);
+
+        self.end_turn_button.init_from_parent_ref(owner);
     }
 
     fn add_card_to_hand(&self, event: AddCardToHandClientEvent, owner: TRef<Node>) {

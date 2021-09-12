@@ -2,6 +2,7 @@ mod godot_extensions;
 
 use crate::SignalName;
 use gdnative::prelude::*;
+use log::info;
 use std::ops::Deref;
 
 /// Load a scene.
@@ -47,8 +48,28 @@ pub(crate) fn connect_signal<U: SubClass<Node>>(
 #[derive(Debug)]
 pub(crate) struct NodeRef<T> {
     _phantom: std::marker::PhantomData<T>,
-    reference: Ref<Node>,
+    reference: Option<Ref<Node>>,
     path: String,
+}
+
+impl<T> NodeRef<T> {
+    pub fn from_existing(path: impl AsRef<str>, reference: Ref<Node>) -> Self {
+        Self {
+            _phantom: std::marker::PhantomData::default(),
+            reference: Some(reference),
+            path: path.as_ref().to_string(),
+        }
+    }
+
+    pub fn from_path(path: impl AsRef<str>) -> Self {
+        info!("NodeRef frompath: {}", path.as_ref());
+
+        Self {
+            _phantom: std::marker::PhantomData::default(),
+            reference: None,
+            path: path.as_ref().to_string(),
+        }
+    }
 }
 
 impl<T> NodeRef<T>
@@ -62,26 +83,35 @@ where
         Self::from_existing(path, child)
     }
 
+    pub fn init_from_parent<P, R>(&mut self, parent: P)
+    where
+        P: AsRef<R>,
+        R: SubClass<Node>,
+    {
+        let x = parent.as_ref().upcast::<Node>();
+        let child = x.get_node(&self.path).unwrap();
+        self.reference = Some(child);
+        info!("NodeRef {} init complete", self.path);
+    }
+
     pub fn resolve(&self) -> TRef<T> {
-        let r = unsafe { self.reference.assume_safe() };
+        let r = unsafe {
+            self.reference
+                .unwrap_or_else(|| panic!("Node ref was not initialized: {}", self.path))
+                .assume_safe()
+        };
         let r = r.cast::<T>().unwrap();
         r
     }
 
     pub fn resolve_ref(&self) -> &T {
-        let r = unsafe { self.reference.assume_safe() };
+        let r = unsafe {
+            self.reference
+                .unwrap_or_else(|| panic!("Node ref was not initialized: {}", self.path))
+                .assume_safe()
+        };
         let r = r.cast::<T>().unwrap();
         r.as_ref()
-    }
-}
-
-impl<T> NodeRef<T> {
-    pub fn from_existing(path: impl AsRef<str>, reference: Ref<Node>) -> Self {
-        Self {
-            _phantom: std::marker::PhantomData::default(),
-            reference,
-            path: path.as_ref().to_string(),
-        }
     }
 }
 
@@ -89,6 +119,13 @@ impl<T> NodeRef<T>
 where
     T: NativeClass<Base = Spatial>,
 {
+    pub fn init_from_parent_ref(&mut self, parent: TRef<impl SubClass<Node>>) {
+        let parent = parent.upcast::<Node>();
+        let child = parent.get_node(&self.path).unwrap();
+        self.reference = Some(child);
+        info!("NodeRef {} init complete", self.path);
+    }
+
     pub fn from_parent_ref(path: impl AsRef<str>, parent: TRef<Node>) -> Self {
         let child = parent.get_node(path.as_ref()).unwrap();
 
@@ -96,7 +133,11 @@ where
     }
 
     pub fn resolve_instance(&self) -> RefInstance<T, Shared> {
-        let r = unsafe { self.reference.assume_safe() };
+        let r = unsafe {
+            self.reference
+                .unwrap_or_else(|| panic!("Node ref was not initialized: {}", self.path))
+                .assume_safe()
+        };
         let r = r.cast::<Spatial>().unwrap();
         let r = r.cast_instance::<T>().unwrap();
         r
