@@ -100,6 +100,9 @@ impl World {
         }
 
         let button = self.end_turn_button.resolve_instance();
+        button
+            .map(|t, _| t.set_text("hello"))
+            .expect("Could not set_text on textbox");
     }
 
     fn update_from_creature_set_event(&self, event: CreatureSetClientEvent, owner: TRef<Node>) {

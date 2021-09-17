@@ -23,11 +23,11 @@ impl EndTurnButton {
         }
     }
 
-    fn set_text(&self) {
+    pub fn set_text(&self, text: &str) {
         self.text_box
             .resolve_instance()
             .map_mut(|t, _| {
-                t.set_text("hello");
+                t.set_text(text);
             })
             .expect("Could not set text on EndTurnButton textbox");
     }

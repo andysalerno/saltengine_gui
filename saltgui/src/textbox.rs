@@ -25,14 +25,13 @@ impl TextBox {
 impl TextBox {
     #[export]
     fn _ready(&mut self, owner: TRef<Spatial>) {
-        info!("Textbox ready start");
         self.textbox.init_from_parent(owner);
-        info!("Textbox ready start end");
         self.is_ready = true;
     }
 
     pub fn set_text(&self, text: &str) {
         if self.is_ready {
+            info!("Setting textbox text to: {}", text);
             self.textbox.resolve_ref().set_text(text);
         } else {
             warn!("set_text invoked when TextBox is not yet ready");
