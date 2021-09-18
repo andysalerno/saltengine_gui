@@ -8,8 +8,8 @@ use crate::card_instance::CardInstance;
 use crate::end_turn_button::{EndTurnButton, END_TURN_CLICKED_SIGNAL};
 use crate::gui_mana_counter::ManaCounter;
 use crate::hand::{Hand, PLAYER_HAND_CARD_DRAGGED};
+use crate::util;
 use crate::util::NodeRef;
-use crate::{hand::HandRef, util};
 use gdnative::api::utils::NodeExt;
 use gdnative::api::{Area, Camera};
 use gdnative::prelude::*;
@@ -30,7 +30,6 @@ const BOARD_SLOT_COUNT: usize = 24;
 const BOARD_SLOT_PATH_PREFIX: &str = "BoardSlot";
 const BOARD_PATH_RELATIVE: &str = "Board";
 const PLAYER_HAND_PATH_RELATIVE: &str = "PlayerHand";
-const _PLAYER_HAND_NAME: &str = "PlayerHand";
 const END_TURN_BUTTON: &str = "EndTurnButton";
 const MANA_DISPLAY: &str = "ManaCounter";
 
@@ -42,6 +41,7 @@ pub struct World {
     message_channel: BiChannel<FromGui, ToGui>,
     end_turn_button: NodeRef<EndTurnButton, Spatial>,
     mana_display: NodeRef<ManaCounter, Control>,
+    player_hand: NodeRef<Hand, Spatial>,
 }
 
 #[derive(Debug, Default)]
@@ -50,6 +50,7 @@ struct WorldState {
     opponent_id: Option<PlayerId>,
     dragging_hand_card: Option<NodePath>,
     card_to_summon: Option<(NodeRef<BoardSlot, Spatial>, NodePath)>,
+    mana_count: usize,
 }
 
 impl World {
@@ -77,6 +78,7 @@ impl World {
             message_channel: gui_side_channel,
             end_turn_button: NodeRef::<EndTurnButton, Spatial>::from_path(END_TURN_BUTTON),
             mana_display: NodeRef::<ManaCounter, Control>::from_path(MANA_DISPLAY),
+            player_hand: NodeRef::<Hand, Spatial>::from_path(PLAYER_HAND_PATH_RELATIVE),
         }
     }
 
@@ -137,9 +139,9 @@ impl World {
     }
 
     /// Get a shared `RefInstance` to the player's Hand.
-    fn player_hand(&self, owner: TRef<Node>) -> Option<RefInstance<Hand, Shared>> {
-        self.get_as(PLAYER_HAND_PATH_RELATIVE, owner)
-    }
+    // fn player_hand(&self, owner: TRef<Node>) -> Option<RefInstance<Hand, Shared>> {
+    //     self.get_as(PLAYER_HAND_PATH_RELATIVE, owner)
+    // }
 
     /// Get a card instance given its path.
     fn card_instance(
@@ -216,21 +218,24 @@ impl World {
         GodotLog::init();
         info!("World initialized.  Hello.");
 
+        self.end_turn_button.init_from_parent_ref(owner);
+        self.mana_display.init_from_parent_ref(owner);
+        self.player_hand.init_from_parent_ref(owner);
+
         self.connect_boardslot_signals(owner);
         self.connect_hand_card_dragged(owner);
         self.connect_end_turn_clicked(owner);
         self.init_board_slot_pos(owner);
-
-        self.end_turn_button.init_from_parent_ref(owner);
-        self.mana_display.init_from_parent_ref(owner);
     }
 
-    fn add_card_to_hand(&self, event: AddCardToHandClientEvent, owner: TRef<Node>) {
+    fn add_card_to_hand(&self, event: AddCardToHandClientEvent, _owner: TRef<Node>) {
         info!("World is adding a card to the player's hand.");
-        let hand = self.player_hand(owner).unwrap();
-        let mut hand = HandRef::new(hand.base());
+        let hand = self.player_hand.resolve_instance();
 
-        hand.add_card(&event.card);
+        hand.map_mut(|h, n| {
+            h.add_card(&event.card, n);
+        })
+        .expect("failed to add card to hand");
     }
 
     fn init_board_slot_pos(&self, owner: TRef<Node>) {
@@ -364,7 +369,8 @@ impl World {
     }
 
     fn connect_hand_card_dragged(&self, owner: TRef<Node>) {
-        let hand = self.player_hand(owner).unwrap();
+        // let hand = self.player_hand(owner).unwrap();
+        let hand = self.player_hand.resolve_instance();
         let hand = hand.base();
 
         util::connect_signal(
@@ -426,6 +432,15 @@ impl World {
             owner.get_path(),
             data
         );
+
+        let cur_mana = self.state.mana_count;
+
+        self.mana_display
+            .resolve_instance()
+            .map(|a, b| {
+                a.set_text(&format!("yoo!! current mana is: {}", cur_mana));
+            })
+            .expect("failed to update mana display label");
     }
 
     /// Invoked by a signal whenever a card in the player's hand begins or ends dragging.

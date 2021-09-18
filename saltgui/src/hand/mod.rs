@@ -23,6 +23,42 @@ impl Hand {
     fn new(_owner: &Spatial) -> Self {
         Self { hand_len: 0 }
     }
+
+    pub fn add_card(&mut self, card: &UnitCardInstancePlayerView, owner: TRef<Spatial>) {
+        info!("Hand is receiving a card: {}", card.definition().title());
+
+        let card_instance = CardInstance::new_instance();
+
+        // let offset = hand.map(|n, _| n.hand_len).unwrap() as f32 * OFFSET_DIST_MULTIPLIER;
+        let offset = self.hand_len as f32 * OFFSET_DIST_MULTIPLIER;
+
+        card_instance
+            .map_mut(|c, n| {
+                let def = card.definition();
+                c.set_title(def.title());
+                c.set_body(def.text());
+
+                c.set_view(card.clone());
+
+                n.translate(Vector3::new(offset, 0., 0.));
+
+                util::connect_signal(n, CARD_DRAGGED, owner, "on_card_dragged");
+            })
+            .unwrap();
+
+        self.hand_len += 1;
+
+        let card_instance = card_instance.into_base();
+        let card_instance = card_instance.into_shared();
+        owner.add_child(card_instance, false);
+
+        let card_instance = unsafe { card_instance.assume_safe() };
+        let card_path = card_instance.get_path();
+
+        owner.emit_signal(PLAYER_HAND_CARD_ADDED_SIGNAL, &[card_path.to_variant()]);
+
+        info!("Added card {:?} to PlayerHand.", card_path);
+    }
 }
 
 #[methods]
@@ -32,10 +68,10 @@ impl Hand {
         info!("Hand is ready.");
     }
 
-    #[export]
-    fn add_card(&mut self, _owner: TRef<Spatial>) {
-        info!("add_card was invoked");
-    }
+    // #[export]
+    // fn add_card(&mut self, _owner: TRef<Spatial>) {
+    //     info!("add_card was invoked");
+    // }
 
     fn register(builder: &ClassBuilder<Self>) {
         builder
@@ -91,53 +127,5 @@ impl Hand {
             PLAYER_HAND_CARD_DRAGGED,
             &[dragged_card_path, is_ended, mouse_pos_2d],
         );
-    }
-}
-
-pub struct HandRef<'a> {
-    node: TRef<'a, Spatial>,
-}
-
-impl<'a> HandRef<'a> {
-    pub fn new(node: TRef<'a, Spatial>) -> Self {
-        Self { node }
-    }
-
-    pub fn add_card(&mut self, card: &UnitCardInstancePlayerView) {
-        info!("Hand is receiving a card: {}", card.definition().title());
-
-        let card_instance = CardInstance::new_instance();
-
-        let hand = self.node.cast_instance::<Hand>().unwrap();
-        let offset = hand.map(|n, _| n.hand_len).unwrap() as f32 * OFFSET_DIST_MULTIPLIER;
-
-        card_instance
-            .map_mut(|c, n| {
-                let def = card.definition();
-                c.set_title(def.title());
-                c.set_body(def.text());
-
-                c.set_view(card.clone());
-
-                n.translate(Vector3::new(offset, 0., 0.));
-
-                util::connect_signal(n, CARD_DRAGGED, self.node, "on_card_dragged");
-            })
-            .unwrap();
-
-        hand.map_mut(|hand, _| hand.hand_len += 1).unwrap();
-
-        // let card_instance = card_instance.into_base().into_shared();
-        let card_instance = card_instance.into_base();
-        let card_instance = card_instance.into_shared();
-        self.node.add_child(card_instance, false);
-
-        let card_instance = unsafe { card_instance.assume_safe() };
-        let card_path = card_instance.get_path();
-
-        self.node
-            .emit_signal(PLAYER_HAND_CARD_ADDED_SIGNAL, &[card_path.to_variant()]);
-
-        info!("Added card {:?} to PlayerHand.", card_path);
     }
 }
