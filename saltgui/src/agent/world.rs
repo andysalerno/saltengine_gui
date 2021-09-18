@@ -6,6 +6,7 @@ use crate::agent::messages::FromGui;
 use crate::board_slot::{BoardSlot, SlotPos, CLICK_RELEASED_SIGNAL};
 use crate::card_instance::CardInstance;
 use crate::end_turn_button::{EndTurnButton, END_TURN_CLICKED_SIGNAL};
+use crate::gui_mana_counter::ManaCounter;
 use crate::hand::{Hand, PLAYER_HAND_CARD_DRAGGED};
 use crate::util::NodeRef;
 use crate::{hand::HandRef, util};
@@ -31,6 +32,7 @@ const BOARD_PATH_RELATIVE: &str = "Board";
 const PLAYER_HAND_PATH_RELATIVE: &str = "PlayerHand";
 const _PLAYER_HAND_NAME: &str = "PlayerHand";
 const END_TURN_BUTTON: &str = "EndTurnButton";
+const MANA_DISPLAY: &str = "ManaCounter";
 
 #[derive(NativeClass)]
 #[inherit(Node)]
@@ -38,7 +40,8 @@ pub struct World {
     _network_thread: JoinHandle<()>,
     state: WorldState,
     message_channel: BiChannel<FromGui, ToGui>,
-    end_turn_button: NodeRef<EndTurnButton>,
+    end_turn_button: NodeRef<EndTurnButton, Spatial>,
+    mana_display: NodeRef<ManaCounter, Control>,
 }
 
 #[derive(Debug, Default)]
@@ -46,7 +49,7 @@ struct WorldState {
     player_id: Option<PlayerId>,
     opponent_id: Option<PlayerId>,
     dragging_hand_card: Option<NodePath>,
-    card_to_summon: Option<(NodeRef<BoardSlot>, NodePath)>,
+    card_to_summon: Option<(NodeRef<BoardSlot, Spatial>, NodePath)>,
 }
 
 impl World {
@@ -72,7 +75,8 @@ impl World {
             _network_thread: handle,
             state: WorldState::default(),
             message_channel: gui_side_channel,
-            end_turn_button: NodeRef::<EndTurnButton>::from_path(END_TURN_BUTTON),
+            end_turn_button: NodeRef::<EndTurnButton, Spatial>::from_path(END_TURN_BUTTON),
+            mana_display: NodeRef::<ManaCounter, Control>::from_path(MANA_DISPLAY),
         }
     }
 
@@ -125,7 +129,7 @@ impl World {
             "{}/{}{}",
             BOARD_PATH_RELATIVE, BOARD_SLOT_PATH_PREFIX, slot_index
         );
-        let slot: NodeRef<BoardSlot> = NodeRef::from_parent_ref(&slot_path, owner);
+        let slot: NodeRef<BoardSlot, Spatial> = NodeRef::from_parent_ref(&slot_path, owner);
 
         let slot = slot.resolve_instance();
         slot.map_mut(|a, _| a.receive_summon(event))
@@ -218,6 +222,7 @@ impl World {
         self.init_board_slot_pos(owner);
 
         self.end_turn_button.init_from_parent_ref(owner);
+        self.mana_display.init_from_parent_ref(owner);
     }
 
     fn add_card_to_hand(&self, event: AddCardToHandClientEvent, owner: TRef<Node>) {
@@ -243,7 +248,7 @@ impl World {
                 "{}/{}{}",
                 BOARD_PATH_RELATIVE, BOARD_SLOT_PATH_PREFIX, slot_index
             );
-            let slot: NodeRef<BoardSlot> = NodeRef::from_parent_ref(&slot_path, owner);
+            let slot: NodeRef<BoardSlot, Spatial> = NodeRef::from_parent_ref(&slot_path, owner);
             let slot = slot.resolve_instance();
             slot.map_mut(|a, _| {
                 a.set_pos(pos);
@@ -263,7 +268,7 @@ impl World {
                 "{}/{}{}",
                 BOARD_PATH_RELATIVE, BOARD_SLOT_PATH_PREFIX, slot_index
             );
-            let slot: NodeRef<BoardSlot> = NodeRef::from_parent_ref(&slot_path, owner);
+            let slot: NodeRef<BoardSlot, Spatial> = NodeRef::from_parent_ref(&slot_path, owner);
             let slot = slot.resolve_instance();
             slot.map_mut(|a, _| {
                 a.set_pos(pos);
@@ -283,7 +288,7 @@ impl World {
                 "{}/{}{}",
                 BOARD_PATH_RELATIVE, BOARD_SLOT_PATH_PREFIX, slot_index
             );
-            let slot: NodeRef<BoardSlot> = NodeRef::from_parent_ref(&slot_path, owner);
+            let slot: NodeRef<BoardSlot, Spatial> = NodeRef::from_parent_ref(&slot_path, owner);
             let slot = slot.resolve_instance();
             slot.map_mut(|a, _| {
                 a.set_pos(pos);
@@ -303,7 +308,7 @@ impl World {
                 "{}/{}{}",
                 BOARD_PATH_RELATIVE, BOARD_SLOT_PATH_PREFIX, slot_index
             );
-            let slot: NodeRef<BoardSlot> = NodeRef::from_parent_ref(&slot_path, owner);
+            let slot: NodeRef<BoardSlot, Spatial> = NodeRef::from_parent_ref(&slot_path, owner);
             let slot = slot.resolve_instance();
             slot.map_mut(|a, _| {
                 a.set_pos(pos);
@@ -391,7 +396,7 @@ impl World {
                 })
                 .expect("Failed to send request from guid to network thread.");
 
-            let hand_card: NodeRef<CardInstance> =
+            let hand_card: NodeRef<CardInstance, Spatial> =
                 NodeRef::from_parent_ref(card_path.to_string(), owner);
 
             let hand_card = hand_card.resolve_instance();
@@ -454,7 +459,7 @@ impl World {
         &self,
         owner: TRef<Node>,
         mouse_pos: Vector2,
-    ) -> Option<NodeRef<BoardSlot>> {
+    ) -> Option<NodeRef<BoardSlot, Spatial>> {
         // Cast ray from the moust position to the BoardSlot layer.
         let camera = self.camera(owner).unwrap();
 
@@ -488,7 +493,7 @@ impl World {
 
                 info!("NodeRef creating from path: {:?}", parent_path);
 
-                let node_ref: NodeRef<BoardSlot> =
+                let node_ref: NodeRef<BoardSlot, Spatial> =
                     NodeRef::from_parent_ref(parent_path.to_string(), owner);
                 node_ref
             })

@@ -18,7 +18,7 @@ use salt_engine::{
 #[register_with(Self::register)]
 #[inherit(Spatial)]
 pub struct BoardSlot {
-    textbox: NodeRef<TextBox>,
+    textbox: NodeRef<TextBox, Spatial>,
     board_pos: Option<SlotPos>,
 }
 

@@ -46,16 +46,18 @@ pub(crate) fn connect_signal<U: SubClass<Node>>(
 /// A longer-lived reference to a Godot Node object.
 /// Can be resolved to a custom (`NativeClass`) script or a Godot object.
 #[derive(Debug)]
-pub(crate) struct NodeRef<T> {
+pub(crate) struct NodeRef<T, N> {
     _phantom: std::marker::PhantomData<T>,
+    _phantom_b: std::marker::PhantomData<N>,
     reference: Option<Ref<Node>>,
     path: String,
 }
 
-impl<T> NodeRef<T> {
+impl<T, N> NodeRef<T, N> {
     pub fn from_existing(path: impl AsRef<str>, reference: Ref<Node>) -> Self {
         Self {
             _phantom: std::marker::PhantomData::default(),
+            _phantom_b: std::marker::PhantomData::default(),
             reference: Some(reference),
             path: path.as_ref().to_string(),
         }
@@ -64,13 +66,14 @@ impl<T> NodeRef<T> {
     pub fn from_path(path: impl AsRef<str>) -> Self {
         Self {
             _phantom: std::marker::PhantomData::default(),
+            _phantom_b: std::marker::PhantomData::default(),
             reference: None,
             path: path.as_ref().to_string(),
         }
     }
 }
 
-impl<T> NodeRef<T>
+impl<T, N> NodeRef<T, N>
 where
     T: SubClass<Node>,
 {
@@ -113,9 +116,10 @@ where
     }
 }
 
-impl<T> NodeRef<T>
+impl<T, N> NodeRef<T, N>
 where
-    T: NativeClass<Base = Spatial>,
+    T: NativeClass<Base = N>,
+    N: SubClass<Node>,
 {
     pub fn init_from_parent_ref(&mut self, parent: TRef<impl SubClass<Node>>) {
         let parent = parent.upcast::<Node>();
@@ -136,7 +140,7 @@ where
                 .unwrap_or_else(|| panic!("Node ref was not initialized: {}", self.path))
                 .assume_safe()
         };
-        let r = r.cast::<Spatial>().unwrap();
+        let r = r.cast::<N>().unwrap();
         let r = r.cast_instance::<T>().unwrap();
         r
     }

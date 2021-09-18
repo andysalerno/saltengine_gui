@@ -2,18 +2,18 @@ use crate::util::NodeRef;
 use gdnative::{api::RichTextLabel, prelude::*};
 use log::{info, warn};
 
-const LABEL_PATH: &str = "Viewport/GUI/Panel/RichTextLabel";
+const LABEL_PATH: &str = "RichTextLabel";
 
 #[derive(NativeClass, Debug)]
 #[register_with(Self::register)]
-#[inherit(Spatial)]
-pub struct TextBox {
-    textbox: NodeRef<RichTextLabel, Spatial>,
+#[inherit(Control)]
+pub struct ManaCounter {
+    textbox: NodeRef<RichTextLabel, Control>,
     is_ready: bool,
 }
 
-impl TextBox {
-    fn new(_owner: &Spatial) -> Self {
+impl ManaCounter {
+    fn new(_owner: &Control) -> Self {
         Self {
             textbox: NodeRef::from_path(LABEL_PATH),
             is_ready: false,
@@ -22,9 +22,9 @@ impl TextBox {
 }
 
 #[methods]
-impl TextBox {
+impl ManaCounter {
     #[export]
-    fn _ready(&mut self, owner: TRef<Spatial>) {
+    fn _ready(&mut self, owner: TRef<Control>) {
         self.textbox.init_from_parent(owner);
         self.is_ready = true;
     }

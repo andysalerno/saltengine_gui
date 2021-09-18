@@ -9,6 +9,7 @@ mod agent;
 mod board_slot;
 mod card_instance;
 mod end_turn_button;
+mod gui_mana_counter;
 mod hand;
 mod textbox;
 mod util;
@@ -19,6 +20,7 @@ use card_instance::CardInstance;
 use end_turn_button::EndTurnButton;
 use gdnative::prelude::*;
 use godot_log::GodotLog;
+use gui_mana_counter::ManaCounter;
 use hand::Hand;
 use textbox::TextBox;
 
@@ -30,6 +32,7 @@ fn init(handle: InitHandle) {
     handle.add_class::<BoardSlot>();
     handle.add_class::<EndTurnButton>();
     handle.add_class::<TextBox>();
+    handle.add_class::<ManaCounter>();
 }
 
 // Macro that creates the entry-points of the dynamic library.

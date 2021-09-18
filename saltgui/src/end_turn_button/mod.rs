@@ -13,13 +13,13 @@ pub(crate) const END_TURN_CLICKED_SIGNAL: SignalName = SignalName("end_turn_clic
 #[register_with(Self::register)]
 #[inherit(Spatial)]
 pub struct EndTurnButton {
-    text_box: NodeRef<TextBox>,
+    text_box: NodeRef<TextBox, Spatial>,
 }
 
 impl EndTurnButton {
     fn new(_owner: &Spatial) -> Self {
         Self {
-            text_box: NodeRef::<TextBox>::from_path("TextBox"),
+            text_box: NodeRef::<TextBox, Spatial>::from_path("TextBox"),
         }
     }
 
