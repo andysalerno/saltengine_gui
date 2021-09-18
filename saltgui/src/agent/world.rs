@@ -77,14 +77,33 @@ impl World {
     }
 
     /// Observe and react to an event sent to us from the server.
-    fn observe_notifier_event(&self, event: ClientEventView, owner: TRef<Node>) {
+    fn observe_notifier_event(&mut self, event: ClientEventView, owner: TRef<Node>) {
         info!("Gui observes event: {:?}", event);
 
         match event {
             ClientEventView::AddCardToHand(e) => self.add_card_to_hand(e, owner),
             ClientEventView::UnitSet(e) => self.update_from_creature_set_event(e, owner),
             ClientEventView::SummonCreatureFromHand(_) => {}
+            ClientEventView::TurnEnded(id) => self.observe_turn_ended(id, owner),
+            ClientEventView::TurnStarted(id) => self.observe_turn_started(id, owner),
         }
+    }
+
+    fn observe_turn_ended(&self, _player: PlayerId, _owner: TRef<Node>) {
+        // nothing currently
+    }
+
+    fn observe_turn_started(&self, player: PlayerId, _owner: TRef<Node>) {
+        let button_text = if player == self.state.player_id.unwrap() {
+            "End turn"
+        } else {
+            "(Enemy turn)"
+        };
+
+        let button = self.end_turn_button.resolve_instance();
+        button
+            .map(|t, _| t.set_text(button_text))
+            .expect("Could not set_text on textbox");
     }
 
     fn update_from_state(&mut self, state: GameStatePlayerView, _owner: TRef<Node>) {
@@ -92,17 +111,6 @@ impl World {
             self.state.opponent_id = Some(state.opponent_id());
             info!("My opponent is: {:?}", state.opponent_id());
         }
-
-        if state.cur_player_turn() == state.player_id() {
-            info!("It's my turn!");
-        } else {
-            info!("It's the enemy's turn");
-        }
-
-        let button = self.end_turn_button.resolve_instance();
-        button
-            .map(|t, _| t.set_text("hello"))
-            .expect("Could not set_text on textbox");
     }
 
     fn update_from_creature_set_event(&self, event: CreatureSetClientEvent, owner: TRef<Node>) {

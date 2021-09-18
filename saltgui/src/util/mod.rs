@@ -62,8 +62,6 @@ impl<T> NodeRef<T> {
     }
 
     pub fn from_path(path: impl AsRef<str>) -> Self {
-        info!("NodeRef frompath: {}", path.as_ref());
-
         Self {
             _phantom: std::marker::PhantomData::default(),
             reference: None,

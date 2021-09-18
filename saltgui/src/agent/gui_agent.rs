@@ -46,7 +46,7 @@ impl GameClient for GuiClient {
                 board_pos,
                 card_instance_id,
             )),
-            FromGui::EndTurnAction => ClientActionEvent::EndTurn(EndTurnEvent),
+            FromGui::EndTurnAction => ClientActionEvent::EndTurn(EndTurnEvent(self.player_id)),
         }
     }
 
