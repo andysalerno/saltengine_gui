@@ -138,34 +138,13 @@ impl World {
             .expect("Failed to receive summon for slot");
     }
 
-    /// Get a shared `RefInstance` to the player's Hand.
-    // fn player_hand(&self, owner: TRef<Node>) -> Option<RefInstance<Hand, Shared>> {
-    //     self.get_as(PLAYER_HAND_PATH_RELATIVE, owner)
-    // }
-
     /// Get a card instance given its path.
-    fn card_instance(
+    fn card_instance<'a>(
         &self,
         path: impl AsRef<str>,
-        owner: TRef<Node>,
-    ) -> Option<RefInstance<CardInstance, Shared>> {
-        self.get_as(path, owner)
-    }
-
-    fn get_as<T, B>(
-        &self,
-        path: impl AsRef<str>,
-        owner: TRef<Node>,
-    ) -> Option<RefInstance<T, Shared>>
-    where
-        T: NativeClass<Base = B>,
-        B: SubClass<Node>,
-    {
-        owner
-            .get_node(path)
-            .map(|r| unsafe { r.assume_safe() })
-            .map(|r| r.cast::<B>().unwrap())
-            .map(|r| r.cast_instance::<T>().unwrap())
+        owner: TRef<'a, Node>,
+    ) -> Option<RefInstance<'a, CardInstance, Shared>> {
+        util::get_as(path, owner)
     }
 
     fn board(&self, owner: TRef<Node>) -> Option<TRef<Spatial>> {
@@ -324,9 +303,8 @@ impl World {
 
     fn connect_end_turn_clicked(&self, owner: TRef<Node>) {
         // let hand = self.player_hand(owner).unwrap();
-        let button: RefInstance<EndTurnButton, Shared> = self
-            .get_as(END_TURN_BUTTON, owner)
-            .expect("Could not find end turn button node.");
+        let button: RefInstance<EndTurnButton, Shared> =
+            util::get_as(END_TURN_BUTTON, owner).expect("Could not find end turn button node.");
 
         util::connect_signal(
             &*button.base(),

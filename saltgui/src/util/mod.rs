@@ -43,6 +43,21 @@ pub(crate) fn connect_signal<U: SubClass<Node>>(
         .expect("Failed binding signal");
 }
 
+pub(crate) fn get_as<T, B>(
+    path: impl AsRef<str>,
+    owner: TRef<Node>,
+) -> Option<RefInstance<T, Shared>>
+where
+    T: NativeClass<Base = B>,
+    B: SubClass<Node>,
+{
+    owner
+        .get_node(path)
+        .map(|r| unsafe { r.assume_safe() })
+        .map(|r| r.cast::<B>().unwrap())
+        .map(|r| r.cast_instance::<T>().unwrap())
+}
+
 /// A longer-lived reference to a Godot Node object.
 /// Can be resolved to a custom (`NativeClass`) script or a Godot object.
 #[derive(Debug)]
