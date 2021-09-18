@@ -25,7 +25,6 @@ use salt_engine::game_state::PlayerId;
 use smol::channel::TryRecvError;
 use std::thread::JoinHandle;
 
-const _CREATURE_INSTANCE_SCENE: &str = "res://card/creature_instance.tscn";
 const BOARD_SLOT_COUNT: usize = 24;
 const BOARD_SLOT_PATH_PREFIX: &str = "BoardSlot";
 const BOARD_PATH_RELATIVE: &str = "Board";
@@ -33,6 +32,17 @@ const PLAYER_HAND_PATH_RELATIVE: &str = "PlayerHand";
 const END_TURN_BUTTON: &str = "EndTurnButton";
 const MANA_DISPLAY: &str = "ManaCounter";
 
+/// State for maintaining certain UI-specific values over the course of the game.
+#[derive(Debug, Default)]
+struct WorldState {
+    player_id: Option<PlayerId>,
+    opponent_id: Option<PlayerId>,
+    dragging_hand_card: Option<NodePath>,
+    card_to_summon: Option<(NodeRef<BoardSlot, Spatial>, NodePath)>,
+    mana_count: usize,
+}
+
+/// The parent world logic, with ownership over every aspect of the UI.
 #[derive(NativeClass)]
 #[inherit(Node)]
 pub struct World {
@@ -42,15 +52,6 @@ pub struct World {
     end_turn_button: NodeRef<EndTurnButton, Spatial>,
     mana_display: NodeRef<ManaCounter, Control>,
     player_hand: NodeRef<Hand, Spatial>,
-}
-
-#[derive(Debug, Default)]
-struct WorldState {
-    player_id: Option<PlayerId>,
-    opponent_id: Option<PlayerId>,
-    dragging_hand_card: Option<NodePath>,
-    card_to_summon: Option<(NodeRef<BoardSlot, Spatial>, NodePath)>,
-    mana_count: usize,
 }
 
 impl World {
@@ -87,8 +88,8 @@ impl World {
         info!("Gui observes event: {:?}", event);
 
         match event {
-            ClientEventView::AddCardToHand(e) => self.add_card_to_hand(e, owner),
-            ClientEventView::UnitSet(e) => self.update_from_creature_set_event(e, owner),
+            ClientEventView::AddCardToHand(e) => self.observe_add_card_to_hand(e, owner),
+            ClientEventView::UnitSet(e) => self.observe_creature_set_event(e, owner),
             ClientEventView::SummonCreatureFromHand(_) => {}
             ClientEventView::TurnEnded(id) => self.observe_turn_ended(id, owner),
             ClientEventView::TurnStarted(id) => self.observe_turn_started(id, owner),
@@ -112,14 +113,17 @@ impl World {
             .expect("Could not set_text on textbox");
     }
 
-    fn update_from_state(&mut self, state: GameStatePlayerView, _owner: TRef<Node>) {
-        if self.state.opponent_id.is_none() {
-            self.state.opponent_id = Some(state.opponent_id());
-            info!("My opponent is: {:?}", state.opponent_id());
-        }
+    fn observe_add_card_to_hand(&self, event: AddCardToHandClientEvent, _owner: TRef<Node>) {
+        info!("World is adding a card to the player's hand.");
+        let hand = self.player_hand.resolve_instance();
+
+        hand.map_mut(|h, n| {
+            h.add_card(&event.card, n);
+        })
+        .expect("failed to add card to hand");
     }
 
-    fn update_from_creature_set_event(&self, event: CreatureSetClientEvent, owner: TRef<Node>) {
+    fn observe_creature_set_event(&self, event: CreatureSetClientEvent, owner: TRef<Node>) {
         info!("World saw a summon event.");
         let slot_pos = SlotPos {
             row_id: event.pos.row_id,
@@ -136,6 +140,13 @@ impl World {
         let slot = slot.resolve_instance();
         slot.map_mut(|a, _| a.receive_summon(event))
             .expect("Failed to receive summon for slot");
+    }
+
+    fn update_from_state(&mut self, state: GameStatePlayerView, _owner: TRef<Node>) {
+        if self.state.opponent_id.is_none() {
+            self.state.opponent_id = Some(state.opponent_id());
+            info!("My opponent is: {:?}", state.opponent_id());
+        }
     }
 
     /// Get a card instance given its path.
@@ -192,6 +203,7 @@ impl World {
 
 #[methods]
 impl World {
+    /// Invoked by Godot when this instance is done initializing.
     #[export]
     fn _ready(&mut self, owner: TRef<Node>) {
         GodotLog::init();
@@ -207,14 +219,102 @@ impl World {
         self.init_board_slot_pos(owner);
     }
 
-    fn add_card_to_hand(&self, event: AddCardToHandClientEvent, _owner: TRef<Node>) {
-        info!("World is adding a card to the player's hand.");
-        let hand = self.player_hand.resolve_instance();
+    /// Invoked every frame by Godot.
+    #[export]
+    fn _process(&mut self, owner: TRef<Node>, _delta: f64) {
+        if let Some((slot_path, card_path)) = self.state.card_to_summon.take() {
+            info!("Summoning card from within _process().");
+            let card_inst = self
+                .card_instance(card_path.to_string(), owner)
+                .expect("Could not find card instance.");
 
-        hand.map_mut(|h, n| {
-            h.add_card(&event.card, n);
-        })
-        .expect("failed to add card to hand");
+            info!("using map to do the thing........");
+            let card_instance_id = card_inst.map(|a, _| a.expect_view().id()).unwrap();
+
+            let slot_pos = slot_path.resolve_instance().map(|a, b| a.pos()).unwrap();
+            let board_pos = slot_pos.into_board_slot(self.state.player_id.unwrap());
+
+            self.message_channel
+                .send_blocking(FromGui::SummonFromHandToSlotRequest {
+                    board_pos,
+                    card_instance_id,
+                })
+                .expect("Failed to send request from guid to network thread.");
+
+            let hand_card: NodeRef<CardInstance, Spatial> =
+                NodeRef::from_parent_ref(card_path.to_string(), owner);
+
+            let hand_card = hand_card.resolve_instance();
+            hand_card.base().queue_free();
+        }
+
+        let message = match self.message_channel.try_recv() {
+            Ok(msg) => msg,
+            Err(TryRecvError::Closed) => return, // todo: display something?
+            _ => return,
+        };
+
+        match message {
+            ToGui::StateUpdate(state) => self.update_from_state(state, owner),
+            ToGui::ClientEvent(event) => self.observe_notifier_event(event, owner),
+            ToGui::PlayerIdSet(player_id) => self.state.player_id = Some(player_id),
+        }
+    }
+
+    /// Invoked by a signal whenever a boardslot has a "click release" action.
+    /// If there's currently a "dragged card" active, this means the player
+    /// is attempting to summon the dragged card to the given boardslot.
+    #[export]
+    fn on_boardslot_click_released(&self, owner: TRef<Node>, data: Variant) {
+        info!(
+            "world on_boardslot_click_released for {:?} with data: {:?}",
+            owner.get_path(),
+            data
+        );
+
+        let cur_mana = self.state.mana_count;
+
+        self.mana_display
+            .resolve_instance()
+            .map(|a, b| {
+                a.set_text(&format!("yoo!! current mana is: {}", cur_mana));
+            })
+            .expect("failed to update mana display label");
+    }
+
+    /// Invoked by a signal whenever a card in the player's hand begins or ends dragging.
+    #[export]
+    fn on_hand_card_dragged(
+        &mut self,
+        owner: TRef<Node>,
+        dragged_card_path: Variant,
+        is_ended: Variant,
+        mouse_pos_2d: Variant,
+    ) {
+        let dragged_card_path = dragged_card_path.to_node_path();
+        let is_ended = is_ended.to_bool();
+
+        if is_ended {
+            self.state.dragging_hand_card = None;
+            info!("World cleared dragged card.");
+            let mouse_pos = mouse_pos_2d.to_vector2();
+            if let Some(slot_path) = self.find_overlapping_boardslot(owner, mouse_pos) {
+                self.state.card_to_summon = Some((slot_path, dragged_card_path));
+            } else {
+                info!("User released card, but not over a boardslot.");
+            }
+        } else {
+            info!("World storing new dragged card: {:?}", dragged_card_path);
+            self.state.dragging_hand_card = Some(dragged_card_path);
+        }
+    }
+
+    #[export]
+    fn on_end_turn_clicked(&self, _owner: TRef<Node>) {
+        info!("The world sees taht end turn was clicked.");
+        self.message_channel
+            .send_blocking(FromGui::EndTurnAction)
+            .unwrap();
     }
 
     fn init_board_slot_pos(&self, owner: TRef<Node>) {
@@ -314,14 +414,6 @@ impl World {
         );
     }
 
-    #[export]
-    fn on_end_turn_clicked(&self, _owner: TRef<Node>) {
-        info!("The world sees taht end turn was clicked.");
-        self.message_channel
-            .send_blocking(FromGui::EndTurnAction)
-            .unwrap();
-    }
-
     fn connect_boardslot_signals(&self, owner: TRef<Node>) {
         info!("Looking for boardslot children of {:?}", owner.get_path());
 
@@ -357,95 +449,6 @@ impl World {
             owner,
             "on_hand_card_dragged",
         );
-    }
-
-    #[export]
-    fn _process(&mut self, owner: TRef<Node>, _delta: f64) {
-        if let Some((slot_path, card_path)) = self.state.card_to_summon.take() {
-            info!("Summoning card from within _process().");
-            let card_inst = self
-                .card_instance(card_path.to_string(), owner)
-                .expect("Could not find card instance.");
-
-            info!("using map to do the thing........");
-            let card_instance_id = card_inst.map(|a, _| a.expect_view().id()).unwrap();
-
-            let slot_pos = slot_path.resolve_instance().map(|a, b| a.pos()).unwrap();
-            let board_pos = slot_pos.into_board_slot(self.state.player_id.unwrap());
-
-            self.message_channel
-                .send_blocking(FromGui::SummonFromHandToSlotRequest {
-                    board_pos,
-                    card_instance_id,
-                })
-                .expect("Failed to send request from guid to network thread.");
-
-            let hand_card: NodeRef<CardInstance, Spatial> =
-                NodeRef::from_parent_ref(card_path.to_string(), owner);
-
-            let hand_card = hand_card.resolve_instance();
-            hand_card.base().queue_free();
-        }
-
-        let message = match self.message_channel.try_recv() {
-            Ok(msg) => msg,
-            Err(TryRecvError::Closed) => return, // todo: display something?
-            _ => return,
-        };
-
-        match message {
-            ToGui::StateUpdate(state) => self.update_from_state(state, owner),
-            ToGui::ClientEvent(event) => self.observe_notifier_event(event, owner),
-            ToGui::PlayerIdSet(player_id) => self.state.player_id = Some(player_id),
-        }
-    }
-
-    /// Invoked by a signal whenever a boardslot has a "click release" action.
-    /// If there's currently a "dragged card" active, this means the player
-    /// is attempting to summon the dragged card to the given boardslot.
-    #[export]
-    fn on_boardslot_click_released(&self, owner: TRef<Node>, data: Variant) {
-        info!(
-            "world on_boardslot_click_released for {:?} with data: {:?}",
-            owner.get_path(),
-            data
-        );
-
-        let cur_mana = self.state.mana_count;
-
-        self.mana_display
-            .resolve_instance()
-            .map(|a, b| {
-                a.set_text(&format!("yoo!! current mana is: {}", cur_mana));
-            })
-            .expect("failed to update mana display label");
-    }
-
-    /// Invoked by a signal whenever a card in the player's hand begins or ends dragging.
-    #[export]
-    fn on_hand_card_dragged(
-        &mut self,
-        owner: TRef<Node>,
-        dragged_card_path: Variant,
-        is_ended: Variant,
-        mouse_pos_2d: Variant,
-    ) {
-        let dragged_card_path = dragged_card_path.to_node_path();
-        let is_ended = is_ended.to_bool();
-
-        if is_ended {
-            self.state.dragging_hand_card = None;
-            info!("World cleared dragged card.");
-            let mouse_pos = mouse_pos_2d.to_vector2();
-            if let Some(slot_path) = self.find_overlapping_boardslot(owner, mouse_pos) {
-                self.state.card_to_summon = Some((slot_path, dragged_card_path));
-            } else {
-                info!("User released card, but not over a boardslot.");
-            }
-        } else {
-            info!("World storing new dragged card: {:?}", dragged_card_path);
-            self.state.dragging_hand_card = Some(dragged_card_path);
-        }
     }
 
     fn find_overlapping_boardslot(
