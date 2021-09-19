@@ -39,7 +39,10 @@ struct WorldState {
     opponent_id: Option<PlayerId>,
     dragging_hand_card: Option<NodePath>,
     card_to_summon: Option<(NodeRef<BoardSlot, Spatial>, NodePath)>,
-    mana_count: usize,
+    player_mana_limit: usize,
+    enemy_mana_limit: usize,
+    player_mana_count: usize,
+    enemy_mana_count: usize,
 }
 
 /// The parent world logic, with ownership over every aspect of the UI.
@@ -83,7 +86,7 @@ impl World {
         }
     }
 
-    /// Observe and react to an event sent to us from the server.
+    /// Invoked each frame where there is a message from the server with a notification update.
     fn observe_notifier_event(&mut self, event: ClientEventView, owner: TRef<Node>) {
         info!("Gui observes event: {:?}", event);
 
@@ -93,11 +96,39 @@ impl World {
             ClientEventView::SummonCreatureFromHand(_) => {}
             ClientEventView::TurnEnded(id) => self.observe_turn_ended(id, owner),
             ClientEventView::TurnStarted(id) => self.observe_turn_started(id, owner),
+            ClientEventView::PlayerGainMana(player, count) => {
+                self.observe_player_gain_mana(player, count, owner);
+            }
         }
     }
 
     fn observe_turn_ended(&self, _player: PlayerId, _owner: TRef<Node>) {
         // nothing currently
+    }
+
+    fn observe_player_gain_mana(
+        &mut self,
+        player: PlayerId,
+        mana_gain_count: usize,
+        _owner: TRef<Node>,
+    ) {
+        if player == self.state.player_id.unwrap() {
+            self.state.player_mana_limit += mana_gain_count;
+            self.mana_display
+                .resolve_instance()
+                .map(|a, b| {
+                    a.set_text(&format!("Player mana: X/{}", self.state.player_mana_limit));
+                })
+                .expect("Unable to set mana label");
+        } else {
+            self.state.enemy_mana_limit += mana_gain_count;
+            self.mana_display
+                .resolve_instance()
+                .map(|a, b| {
+                    a.set_text(&format!("Enemey mana: X/{}", self.state.enemy_mana_limit));
+                })
+                .expect("Unable to set mana label");
+        }
     }
 
     fn observe_turn_started(&self, player: PlayerId, _owner: TRef<Node>) {
@@ -142,6 +173,7 @@ impl World {
             .expect("Failed to receive summon for slot");
     }
 
+    /// Invoked each frame where there is a message from the server with a state update.
     fn update_from_state(&mut self, state: GameStatePlayerView, _owner: TRef<Node>) {
         if self.state.opponent_id.is_none() {
             self.state.opponent_id = Some(state.opponent_id());
@@ -271,15 +303,6 @@ impl World {
             owner.get_path(),
             data
         );
-
-        let cur_mana = self.state.mana_count;
-
-        self.mana_display
-            .resolve_instance()
-            .map(|a, b| {
-                a.set_text(&format!("yoo!! current mana is: {}", cur_mana));
-            })
-            .expect("failed to update mana display label");
     }
 
     /// Invoked by a signal whenever a card in the player's hand begins or ends dragging.
