@@ -29,7 +29,11 @@ impl ManaCounter {
         self.is_ready = true;
     }
 
-    pub fn set_text(&self, text: &str) {
+    pub fn set_display(&self, available: usize, limit: usize) {
+        self.set_text(&format!("Mana: {}/{}", available, limit));
+    }
+
+    fn set_text(&self, text: &str) {
         if self.is_ready {
             info!("Setting textbox text to: {}", text);
             self.textbox.resolve_ref().set_text(text);

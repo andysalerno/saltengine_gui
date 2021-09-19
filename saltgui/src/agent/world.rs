@@ -99,11 +99,44 @@ impl World {
             ClientEventView::PlayerGainMana(player, count) => {
                 self.observe_player_gain_mana(player, count, owner);
             }
+            ClientEventView::PlayerSpendMana {
+                player_id,
+                spent_mana_count,
+            } => self.observe_player_spend_mana(player_id, spent_mana_count, owner),
         }
     }
 
     fn observe_turn_ended(&self, _player: PlayerId, _owner: TRef<Node>) {
         // nothing currently
+    }
+
+    fn observe_player_spend_mana(
+        &mut self,
+        player_id: PlayerId,
+        spent_mana_count: usize,
+        _owner: TRef<Node>,
+    ) {
+        if player_id == self.state.player_id.unwrap() {
+            self.state.player_mana_count -= spent_mana_count;
+            let unused = self.state.player_mana_count;
+            let limit = self.state.player_mana_limit;
+            self.mana_display
+                .resolve_instance()
+                .map(|c, _| {
+                    c.set_display(unused, limit);
+                })
+                .expect("Unable to set mana label");
+        } else {
+            self.state.enemy_mana_count -= spent_mana_count;
+            let limit = self.state.enemy_mana_limit;
+            let unused = self.state.enemy_mana_count;
+            self.mana_display
+                .resolve_instance()
+                .map(|c, _| {
+                    c.set_display(unused, limit);
+                })
+                .expect("Unable to set mana label");
+        }
     }
 
     fn observe_player_gain_mana(
@@ -114,28 +147,37 @@ impl World {
     ) {
         if player == self.state.player_id.unwrap() {
             self.state.player_mana_limit += mana_gain_count;
+            let unused = self.state.player_mana_count;
+            let limit = self.state.player_mana_limit;
             self.mana_display
                 .resolve_instance()
-                .map(|a, b| {
-                    a.set_text(&format!("Player mana: X/{}", self.state.player_mana_limit));
+                .map(|c, _| {
+                    c.set_display(unused, limit);
                 })
                 .expect("Unable to set mana label");
         } else {
             self.state.enemy_mana_limit += mana_gain_count;
+            let limit = self.state.enemy_mana_limit;
+            let unused = self.state.enemy_mana_count;
             self.mana_display
                 .resolve_instance()
-                .map(|a, b| {
-                    a.set_text(&format!("Enemey mana: X/{}", self.state.enemy_mana_limit));
+                .map(|c, _| {
+                    c.set_display(unused, limit);
                 })
                 .expect("Unable to set mana label");
         }
     }
 
-    fn observe_turn_started(&self, player: PlayerId, _owner: TRef<Node>) {
-        let button_text = if player == self.state.player_id.unwrap() {
-            "End turn"
+    fn observe_turn_started(&mut self, player: PlayerId, _owner: TRef<Node>) {
+        let button_text;
+        if player == self.state.player_id.unwrap() {
+            // TODO: this is a big hack - we add +1 because we know we gain +1 mana upon turn start.
+            // But in reality, we should be responding to the "gain mana" event, not the "turn start" event.
+            self.state.player_mana_count = self.state.player_mana_limit + 1;
+            button_text = "End turn";
         } else {
-            "(Enemy turn)"
+            self.state.enemy_mana_count = self.state.enemy_mana_limit + 1;
+            button_text = "(Enemy turn)";
         };
 
         let button = self.end_turn_button.resolve_instance();
