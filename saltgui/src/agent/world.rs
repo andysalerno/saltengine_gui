@@ -4,6 +4,7 @@ use crate::agent::bi_channel::create_channel;
 use crate::agent::gui_agent::GuiClient;
 use crate::agent::messages::FromGui;
 use crate::board_slot::{BoardSlot, SlotPos, CLICK_RELEASED_SIGNAL};
+use crate::card_board_instance::CardBoardInstance;
 use crate::card_instance::CardInstance;
 use crate::end_turn_button::{EndTurnButton, END_TURN_CLICKED_SIGNAL};
 use crate::gui_mana_counter::ManaCounter;
@@ -15,6 +16,7 @@ use gdnative::api::{Area, Camera};
 use gdnative::prelude::*;
 use godot_log::GodotLog;
 use log::{info, warn};
+use salt_engine::cards::UnitCardDefinitionView;
 use salt_engine::game_logic::events::{
     AddCardToHandClientEvent, ClientEventView, CreatureSetClientEvent,
 };
@@ -210,8 +212,19 @@ impl World {
         );
         let slot: NodeRef<BoardSlot, Spatial> = NodeRef::from_parent_ref(&slot_path, owner);
 
+        let card_board_instance = CardBoardInstance::new_instance();
+
+        card_board_instance
+            .map_mut(|card, _| {
+                let definition = event.card.definition();
+                card.set_title(definition.title());
+                card.set_stats(format!("{}/{}", definition.attack(), definition.health()));
+            })
+            .expect("Could not update values on card board instance");
+
         let slot = slot.resolve_instance();
-        slot.map_mut(|a, _| a.receive_summon(event))
+
+        slot.map_mut(|a, b| a.receive_summon_z(card_board_instance, b))
             .expect("Failed to receive summon for slot");
     }
 
@@ -296,30 +309,9 @@ impl World {
     /// Invoked every frame by Godot.
     #[export]
     fn _process(&mut self, owner: TRef<Node>, _delta: f64) {
+        // If we have a card queued up for summoning, attempt to summon it.
         if let Some((slot_path, card_path)) = self.state.card_to_summon.take() {
-            info!("Summoning card from within _process().");
-            let card_inst = self
-                .card_instance(card_path.to_string(), owner)
-                .expect("Could not find card instance.");
-
-            info!("using map to do the thing........");
-            let card_instance_id = card_inst.map(|a, _| a.expect_view().id()).unwrap();
-
-            let slot_pos = slot_path.resolve_instance().map(|a, b| a.pos()).unwrap();
-            let board_pos = slot_pos.into_board_slot(self.state.player_id.unwrap());
-
-            self.message_channel
-                .send_blocking(FromGui::SummonFromHandToSlotRequest {
-                    board_pos,
-                    card_instance_id,
-                })
-                .expect("Failed to send request from guid to network thread.");
-
-            let hand_card: NodeRef<CardInstance, Spatial> =
-                NodeRef::from_parent_ref(card_path.to_string(), owner);
-
-            let hand_card = hand_card.resolve_instance();
-            hand_card.base().queue_free();
+            self.summon_card_from_hand(slot_path, card_path, owner);
         }
 
         let message = match self.message_channel.try_recv() {
@@ -333,6 +325,36 @@ impl World {
             ToGui::ClientEvent(event) => self.observe_notifier_event(event, owner),
             ToGui::PlayerIdSet(player_id) => self.state.player_id = Some(player_id),
         }
+    }
+
+    fn summon_card_from_hand(
+        &self,
+        slot_path: NodeRef<BoardSlot, Spatial>,
+        card_path: NodePath,
+        owner: TRef<Node>,
+    ) {
+        info!("Summoning card from within _process().");
+        let card_inst = self
+            .card_instance(card_path.to_string(), owner)
+            .expect("Could not find card instance.");
+
+        let card_instance_id = card_inst.map(|a, _| a.expect_view().id()).unwrap();
+
+        let slot_pos = slot_path.resolve_instance().map(|a, _| a.pos()).unwrap();
+        let board_pos = slot_pos.into_board_slot(self.state.player_id.unwrap());
+
+        self.message_channel
+            .send_blocking(FromGui::SummonFromHandToSlotRequest {
+                board_pos,
+                card_instance_id,
+            })
+            .expect("Failed to send request from gui to network thread.");
+
+        let hand_card: NodeRef<CardInstance, Spatial> =
+            NodeRef::from_parent_ref(card_path.to_string(), owner);
+
+        let hand_card = hand_card.resolve_instance();
+        hand_card.base().queue_free();
     }
 
     /// Invoked by a signal whenever a boardslot has a "click release" action.

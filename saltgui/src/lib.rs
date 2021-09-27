@@ -7,6 +7,7 @@
 )]
 mod agent;
 mod board_slot;
+mod card_board_instance;
 mod card_instance;
 mod end_turn_button;
 mod gui_mana_counter;
@@ -16,6 +17,7 @@ mod util;
 
 use agent::world::World;
 use board_slot::BoardSlot;
+use card_board_instance::CardBoardInstance;
 use card_instance::CardInstance;
 use end_turn_button::EndTurnButton;
 use gdnative::prelude::*;
@@ -33,6 +35,7 @@ fn init(handle: InitHandle) {
     handle.add_class::<EndTurnButton>();
     handle.add_class::<TextBox>();
     handle.add_class::<ManaCounter>();
+    handle.add_class::<CardBoardInstance>();
 }
 
 // Macro that creates the entry-points of the dynamic library.

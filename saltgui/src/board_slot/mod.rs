@@ -1,4 +1,5 @@
 use crate::{
+    card_board_instance::CardBoardInstance,
     textbox::TextBox,
     util::{self, NodeRef},
     SignalName,
@@ -48,6 +49,14 @@ impl BoardSlot {
             textbox: NodeRef::from_path("TextBox"),
             board_pos: None,
         }
+    }
+
+    pub fn receive_summon_z(
+        &self,
+        card_instance: Instance<CardBoardInstance, Unique>,
+        owner: TRef<Spatial>,
+    ) {
+        owner.add_child(card_instance.into_base(), false);
     }
 
     pub fn receive_summon(&self, card_view: CreatureSetClientEvent) {

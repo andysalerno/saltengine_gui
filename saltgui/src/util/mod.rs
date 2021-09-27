@@ -120,6 +120,12 @@ where
         r
     }
 
+    /// Attempts to resolve the Node, returning None if it could not.
+    pub fn try_resolve(&self) -> Option<TRef<T>> {
+        let r = unsafe { self.reference?.assume_safe() };
+        r.cast::<T>()
+    }
+
     pub fn resolve_ref(&self) -> &T {
         let r = unsafe {
             self.reference
@@ -144,7 +150,9 @@ where
     }
 
     pub fn from_parent_ref(path: impl AsRef<str>, parent: TRef<Node>) -> Self {
-        let child = parent.get_node(path.as_ref()).unwrap();
+        let child = parent
+            .get_node(path.as_ref())
+            .expect("Child not found on parent.");
 
         Self::from_existing(path, child)
     }

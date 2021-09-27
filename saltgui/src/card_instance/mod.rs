@@ -1,12 +1,16 @@
+use crate::textbox::TextBox;
+use crate::util::NodeRef;
 use crate::{util, SignalName};
 use gdnative::api::InputEventMouseButton;
 use gdnative::prelude::*;
 use log::info;
+use salt_engine::cards::UnitCardDefinitionView;
 use salt_engine::game_state::UnitCardInstancePlayerView;
 
 const CARD_INSTANCE_SCENE: &str = "res://card/creature_instance.tscn";
 const BODY_TEXT_LABEL: &str = "CardBodyText/Viewport/GUI/Panel/RichTextLabel";
 const TITLE_TEXT_LABEL: &str = "CardTitleText/Viewport/GUI/Panel/RichTextLabel";
+const COST_LABEL: &str = "Cost";
 
 pub(crate) const CARD_DRAGGED: SignalName = SignalName("card_dragged");
 const INPUT_EVENT: SignalName = SignalName("input_event");
@@ -18,15 +22,17 @@ pub struct CardInstance {
     title: String,
     body: String,
     state_is_following_mouse: bool,
+    cost_label: NodeRef<TextBox, Spatial>,
     view: Option<UnitCardInstancePlayerView>,
 }
 
 impl CardInstance {
-    pub(crate) fn new(_owner: &Spatial) -> Self {
+    pub(crate) fn new(_owner: TRef<Spatial>) -> Self {
         Self {
             title: "unset".to_string(),
             body: "unset".to_string(),
             state_is_following_mouse: false,
+            cost_label: NodeRef::from_path(COST_LABEL),
             view: None,
         }
     }
@@ -110,7 +116,9 @@ impl CardInstance {
 #[methods]
 impl CardInstance {
     #[export]
-    fn _ready(&self, owner: TRef<Spatial>) {
+    fn _ready(&mut self, owner: TRef<Spatial>) {
+        self.cost_label.init_from_parent_ref(owner);
+
         let body_text = owner
             .get_node(BODY_TEXT_LABEL)
             .expect("Did not find body text.");
@@ -130,6 +138,20 @@ impl CardInstance {
                 .expect("_title_text was not sane")
                 .set("text", &self.title);
         }
+
+        let cost = self
+            .view
+            .as_ref()
+            .expect("The view should be set before _ready is invoked")
+            .definition()
+            .cost();
+
+        self.cost_label
+            .resolve_instance()
+            .map(|a, _| {
+                a.set_text(&cost.to_string());
+            })
+            .expect("Could not update cost label");
 
         let mouse_collider = owner.get_node("StaticBody").unwrap();
         let mouse_collider = unsafe { mouse_collider.assume_safe_if_sane().unwrap() };

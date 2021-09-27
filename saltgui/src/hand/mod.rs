@@ -68,11 +68,6 @@ impl Hand {
         info!("Hand is ready.");
     }
 
-    // #[export]
-    // fn add_card(&mut self, _owner: TRef<Spatial>) {
-    //     info!("add_card was invoked");
-    // }
-
     fn register(builder: &ClassBuilder<Self>) {
         builder
             .add_property::<i32>("hand_len")
