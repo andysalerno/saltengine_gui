@@ -16,7 +16,12 @@ pub struct CardBoardInstance {
     stats_label: NodeRef<RichTextLabel, Spatial>,
     title_label: NodeRef<RichTextLabel, Spatial>,
     view: Option<UnitCardInstancePlayerView>,
+    target_z: f32,
+    cur_direction: f32,
 }
+
+const MAX_Z: f32 = -1.;
+const MIN_Z: f32 = -5.;
 
 impl CardBoardInstance {
     pub(crate) fn new(_owner: TRef<Spatial>) -> Self {
@@ -26,6 +31,8 @@ impl CardBoardInstance {
             title_label_init: None,
             stats_label_init: None,
             view: None,
+            target_z: MAX_Z,
+            cur_direction: 1.,
         }
     }
 
@@ -66,5 +73,26 @@ impl CardBoardInstance {
         if let Some(init_stats) = self.stats_label_init.take() {
             self.set_stats(init_stats);
         }
+    }
+
+    #[export]
+    fn _physics_process(&mut self, owner: TRef<Spatial>, delta: f32) {
+        let owner = owner.as_ref();
+
+        let cur_z = owner.translation().z;
+
+        if cur_z >= MAX_Z {
+            self.target_z = MIN_Z;
+            self.cur_direction = -1.;
+        } else if cur_z <= MIN_Z {
+            self.target_z = MAX_Z;
+            self.cur_direction = 1.;
+        }
+
+        let increment = delta * self.cur_direction;
+
+        let translation = Vector3::new(0., 0., increment);
+
+        owner.translate_object_local(translation);
     }
 }
