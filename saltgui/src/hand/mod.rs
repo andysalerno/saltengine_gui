@@ -25,7 +25,7 @@ impl Hand {
     }
 
     pub fn add_card(&mut self, card: &UnitCardInstancePlayerView, owner: TRef<Spatial>) {
-        info!("Hand is receiving a card: {}", card.definition().title());
+        info!("Hand is receiving a card: {} {:?}", card.definition().title(), card.id());
 
         let card_instance = CardInstance::new_instance();
 
