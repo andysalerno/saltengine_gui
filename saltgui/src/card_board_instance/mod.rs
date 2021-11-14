@@ -1,6 +1,7 @@
 use crate::util::{self, NodeRef};
 use gdnative::api::RichTextLabel;
 use gdnative::prelude::*;
+use log::info;
 use salt_engine::game_state::UnitCardInstancePlayerView;
 
 const CARD_BOARD_INSTANCE_SCENE: &str = "res://card/card_board_instance/card_board_instance.tscn";
@@ -37,19 +38,19 @@ impl CardBoardInstance {
     }
 
     pub(crate) fn set_title(&mut self, title: impl AsRef<str>) {
-        if let Some(r) = self.title_label.try_resolve() {
-            r.set_text(title);
-        } else {
-            self.title_label_init = Some(title.as_ref().to_string());
-        }
+        // if let Some(r) = self.title_label.try_resolve() {
+        //     r.set_text(title);
+        // } else {
+        //     self.title_label_init = Some(title.as_ref().to_string());
+        // }
     }
 
     pub(crate) fn set_stats(&mut self, stats: impl AsRef<str>) {
-        if let Some(r) = self.stats_label.try_resolve() {
-            r.set_text(stats);
-        } else {
-            self.stats_label_init = Some(stats.as_ref().to_string());
-        }
+        // if let Some(r) = self.stats_label.try_resolve() {
+        //     r.set_text(stats);
+        // } else {
+        //     self.stats_label_init = Some(stats.as_ref().to_string());
+        // }
     }
 
     pub(crate) fn new_instance() -> Instance<CardBoardInstance, Unique> {
@@ -63,6 +64,10 @@ impl CardBoardInstance {
 impl CardBoardInstance {
     #[export]
     fn _ready(&mut self, owner: TRef<Spatial>) {
+        info!(
+            "CardBoardInstance generated under parent: {:?}",
+            owner.get_path()
+        );
         self.stats_label.init_from_parent(owner);
         self.title_label.init_from_parent(owner);
 
@@ -75,24 +80,24 @@ impl CardBoardInstance {
         }
     }
 
-    #[export]
-    fn _physics_process(&mut self, owner: TRef<Spatial>, delta: f32) {
-        let owner = owner.as_ref();
+    // #[export]
+    // fn _physics_process(&mut self, owner: TRef<Spatial>, delta: f32) {
+    //     let owner = owner.as_ref();
 
-        let cur_z = owner.translation().z;
+    //     let cur_z = owner.translation().z;
 
-        if cur_z >= MAX_Z {
-            self.target_z = MIN_Z;
-            self.cur_direction = -1.;
-        } else if cur_z <= MIN_Z {
-            self.target_z = MAX_Z;
-            self.cur_direction = 1.;
-        }
+    //     if cur_z >= MAX_Z {
+    //         self.target_z = MIN_Z;
+    //         self.cur_direction = -1.;
+    //     } else if cur_z <= MIN_Z {
+    //         self.target_z = MAX_Z;
+    //         self.cur_direction = 1.;
+    //     }
 
-        let increment = delta * self.cur_direction;
+    //     let increment = delta * self.cur_direction;
 
-        let translation = Vector3::new(0., 0., increment);
+    //     let translation = Vector3::new(0., 0., increment);
 
-        owner.translate_object_local(translation);
-    }
+    //     owner.translate_object_local(translation);
+    // }
 }

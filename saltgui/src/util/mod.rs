@@ -104,6 +104,7 @@ where
         P: AsRef<R>,
         R: SubClass<Node>,
     {
+        info!("Init NodeRef from parent: {}", self.path);
         let x = parent.as_ref().upcast::<Node>();
         let child = x.get_node(&self.path).unwrap();
         self.reference = Some(child);
@@ -150,6 +151,13 @@ where
     }
 
     pub fn from_parent_ref(path: impl AsRef<str>, parent: TRef<Node>) -> Self {
+        let parent_path = parent.get_path();
+        info!(
+            "Generating ref from parent: {:?} to child: {}",
+            parent_path,
+            path.as_ref()
+        );
+
         let child = parent
             .get_node(path.as_ref())
             .expect("Child not found on parent.");

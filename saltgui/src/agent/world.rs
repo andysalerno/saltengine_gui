@@ -192,10 +192,15 @@ impl World {
         info!("World is adding a card to the player's hand.");
         let hand = self.player_hand.resolve_instance();
 
-        hand.map_mut(|h, n| {
-            h.add_card(&event.card, n);
-        })
-        .expect("failed to add card to hand");
+        if event.player_id == self.state.player_id.unwrap() {
+            hand.map_mut(|h, n| {
+                h.add_card(&event.card.unwrap(), n);
+            })
+            .expect("failed to add card to hand");
+        } else {
+            // Not handling the scenario where opponent draws a card yet
+            info!("Saw that an opponent added card to hand.");
+        }
     }
 
     fn observe_creature_set_event(&self, event: CreatureSetClientEvent, owner: TRef<Node>) {
@@ -210,9 +215,16 @@ impl World {
             "{}/{}{}",
             BOARD_PATH_RELATIVE, BOARD_SLOT_PATH_PREFIX, slot_index
         );
-        let slot: NodeRef<BoardSlot, Spatial> = NodeRef::from_parent_ref(&slot_path, owner);
+
+        info!("Summoning creature to slot path: {}", slot_path);
+
+        let slot: NodeRef<BoardSlot, Spatial> = NodeRef::from_parent_ref(slot_path, owner);
+
+        info!("Generated slot noderef.");
 
         let card_board_instance = CardBoardInstance::new_instance();
+
+        info!("Generated card board instance.");
 
         card_board_instance
             .map_mut(|card, _| {
@@ -222,7 +234,9 @@ impl World {
             })
             .expect("Could not update values on card board instance");
 
+        info!("Resolving path to slot...");
         let slot = slot.resolve_instance();
+        info!("Resolved path to slot.");
 
         slot.map_mut(|a, b| a.receive_summon_z(card_board_instance, b))
             .expect("Failed to receive summon for slot");
