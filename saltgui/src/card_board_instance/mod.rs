@@ -38,19 +38,19 @@ impl CardBoardInstance {
     }
 
     pub(crate) fn set_title(&mut self, title: impl AsRef<str>) {
-        // if let Some(r) = self.title_label.try_resolve() {
-        //     r.set_text(title);
-        // } else {
-        //     self.title_label_init = Some(title.as_ref().to_string());
-        // }
+        if let Some(r) = self.title_label.try_resolve() {
+            r.set_text(title);
+        } else {
+            self.title_label_init = Some(title.as_ref().to_string());
+        }
     }
 
     pub(crate) fn set_stats(&mut self, stats: impl AsRef<str>) {
-        // if let Some(r) = self.stats_label.try_resolve() {
-        //     r.set_text(stats);
-        // } else {
-        //     self.stats_label_init = Some(stats.as_ref().to_string());
-        // }
+        if let Some(r) = self.stats_label.try_resolve() {
+            r.set_text(stats);
+        } else {
+            self.stats_label_init = Some(stats.as_ref().to_string());
+        }
     }
 
     pub(crate) fn new_instance() -> Instance<CardBoardInstance, Unique> {
