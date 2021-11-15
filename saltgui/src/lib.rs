@@ -6,6 +6,7 @@
     clippy::cast_lossless
 )]
 mod agent;
+mod board;
 mod board_slot;
 mod card_board_instance;
 mod card_instance;
@@ -16,6 +17,7 @@ mod textbox;
 mod util;
 
 use agent::world::World;
+use board::Board;
 use board_slot::BoardSlot;
 use card_board_instance::CardBoardInstance;
 use card_instance::CardInstance;
@@ -36,6 +38,7 @@ fn init(handle: InitHandle) {
     handle.add_class::<TextBox>();
     handle.add_class::<ManaCounter>();
     handle.add_class::<CardBoardInstance>();
+    handle.add_class::<Board>();
 }
 
 // Macro that creates the entry-points of the dynamic library.

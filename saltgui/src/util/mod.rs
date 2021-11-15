@@ -68,6 +68,17 @@ pub(crate) struct NodeRef<T, N> {
     path: String,
 }
 
+impl<T, N> Default for NodeRef<T, N> {
+    fn default() -> Self {
+        Self {
+            _phantom: std::marker::PhantomData::default(),
+            _phantom_b: std::marker::PhantomData::default(),
+            reference: std::option::Option::default(),
+            path: std::string::String::default(),
+        }
+    }
+}
+
 impl<T, N> NodeRef<T, N> {
     pub fn from_existing(path: impl AsRef<str>, reference: Ref<Node>) -> Self {
         Self {

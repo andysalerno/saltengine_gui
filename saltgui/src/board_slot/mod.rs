@@ -30,7 +30,7 @@ pub(crate) const CLICK_RELEASED_SIGNAL: SignalName = SignalName("click_released"
 pub(crate) const INPUT_EVENT_SIGNAL: SignalName = SignalName("input_event");
 
 /// Just like `BoardSlot`, except agnostic to the player's ID.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct SlotPos {
     pub is_friendly: bool,
     pub row_id: RowId,

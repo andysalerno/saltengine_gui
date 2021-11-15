@@ -3,6 +3,7 @@ use super::messages::ToGui;
 use crate::agent::bi_channel::create_channel;
 use crate::agent::gui_agent::GuiClient;
 use crate::agent::messages::FromGui;
+use crate::board::Board;
 use crate::board_slot::{BoardSlot, SlotPos, CLICK_RELEASED_SIGNAL};
 use crate::card_board_instance::CardBoardInstance;
 use crate::card_instance::CardInstance;
@@ -21,7 +22,6 @@ use salt_engine::game_logic::events::{
     AddCardToHandClientEvent, ClientEventView, CreatureSetClientEvent,
 };
 use salt_engine::game_runner::GameClient;
-use salt_engine::game_state::board::RowId;
 use salt_engine::game_state::GameStatePlayerView;
 use salt_engine::game_state::PlayerId;
 use smol::channel::TryRecvError;
@@ -45,6 +45,7 @@ struct WorldState {
     enemy_mana_limit: usize,
     player_mana_count: usize,
     enemy_mana_count: usize,
+    board: NodeRef<Board, Spatial>,
 }
 
 /// The parent world logic, with ownership over every aspect of the UI.
@@ -78,9 +79,14 @@ impl World {
 
         info!("Websocket server started on a new thread.");
 
+        let board = NodeRef::<Board, Spatial>::from_path(BOARD_PATH_RELATIVE);
+
         Self {
             _network_thread: handle,
-            state: WorldState::default(),
+            state: WorldState {
+                board,
+                ..WorldState::default()
+            },
             message_channel: gui_side_channel,
             end_turn_button: NodeRef::<EndTurnButton, Spatial>::from_path(END_TURN_BUTTON),
             mana_display: NodeRef::<ManaCounter, Control>::from_path(MANA_DISPLAY),
@@ -210,6 +216,10 @@ impl World {
             is_friendly: event.pos.player_id == self.state.player_id.unwrap(),
             index: event.pos.row_index,
         };
+
+        let board = self.board();
+        let slot = board.map(|b, _| b.get_slot(slot_pos)).unwrap();
+
         let slot_index = self.boardslot_from_pos(owner, slot_pos);
         let slot_path = format!(
             "{}/{}{}",
@@ -259,8 +269,9 @@ impl World {
         util::get_as(path, owner)
     }
 
-    fn board(&self, owner: TRef<Node>) -> Option<TRef<Spatial>> {
-        unsafe { owner.as_ref().get_node_as::<Spatial>(BOARD_PATH_RELATIVE) }
+    fn board(&self) -> RefInstance<Board, Shared> {
+        self.state.board.resolve_instance()
+        //unsafe { owner.as_ref().get_node_as::<Spatial>(BOARD_PATH_RELATIVE) }
     }
 
     fn camera(&self, owner: TRef<Node>) -> Option<TRef<Camera>> {
@@ -310,6 +321,8 @@ impl World {
         GodotLog::init();
         info!("World initialized.  Hello.");
 
+        self.state.board.init_from_parent_ref(owner);
+
         self.end_turn_button.init_from_parent_ref(owner);
         self.mana_display.init_from_parent_ref(owner);
         self.player_hand.init_from_parent_ref(owner);
@@ -317,7 +330,7 @@ impl World {
         self.connect_boardslot_signals(owner);
         self.connect_hand_card_dragged(owner);
         self.connect_end_turn_clicked(owner);
-        self.init_board_slot_pos(owner);
+        // self.init_board_slot_pos(owner);
     }
 
     /// Invoked every frame by Godot.
@@ -418,90 +431,6 @@ impl World {
             .unwrap();
     }
 
-    fn init_board_slot_pos(&self, owner: TRef<Node>) {
-        let row_len = BOARD_SLOT_COUNT / 4;
-
-        // Opponent back
-        for i in 0..row_len {
-            let pos = SlotPos {
-                index: i,
-                row_id: RowId::BackRow,
-                is_friendly: false,
-            };
-            let slot_index = self.boardslot_from_pos(owner, pos);
-            let slot_path = format!(
-                "{}/{}{}",
-                BOARD_PATH_RELATIVE, BOARD_SLOT_PATH_PREFIX, slot_index
-            );
-            let slot: NodeRef<BoardSlot, Spatial> = NodeRef::from_parent_ref(&slot_path, owner);
-            let slot = slot.resolve_instance();
-            slot.map_mut(|a, _| {
-                a.set_pos(pos);
-            })
-            .unwrap();
-        }
-
-        // Opponent front
-        for i in 0..row_len {
-            let pos = SlotPos {
-                index: i,
-                row_id: RowId::FrontRow,
-                is_friendly: false,
-            };
-            let slot_index = self.boardslot_from_pos(owner, pos);
-            let slot_path = format!(
-                "{}/{}{}",
-                BOARD_PATH_RELATIVE, BOARD_SLOT_PATH_PREFIX, slot_index
-            );
-            let slot: NodeRef<BoardSlot, Spatial> = NodeRef::from_parent_ref(&slot_path, owner);
-            let slot = slot.resolve_instance();
-            slot.map_mut(|a, _| {
-                a.set_pos(pos);
-            })
-            .unwrap();
-        }
-
-        // Player front
-        for i in 0..row_len {
-            let pos = SlotPos {
-                index: i,
-                row_id: RowId::FrontRow,
-                is_friendly: true,
-            };
-            let slot_index = self.boardslot_from_pos(owner, pos);
-            let slot_path = format!(
-                "{}/{}{}",
-                BOARD_PATH_RELATIVE, BOARD_SLOT_PATH_PREFIX, slot_index
-            );
-            let slot: NodeRef<BoardSlot, Spatial> = NodeRef::from_parent_ref(&slot_path, owner);
-            let slot = slot.resolve_instance();
-            slot.map_mut(|a, _| {
-                a.set_pos(pos);
-            })
-            .unwrap();
-        }
-
-        // Player back
-        for i in 0..row_len {
-            let pos = SlotPos {
-                index: i,
-                row_id: RowId::BackRow,
-                is_friendly: true,
-            };
-            let slot_index = self.boardslot_from_pos(owner, pos);
-            let slot_path = format!(
-                "{}/{}{}",
-                BOARD_PATH_RELATIVE, BOARD_SLOT_PATH_PREFIX, slot_index
-            );
-            let slot: NodeRef<BoardSlot, Spatial> = NodeRef::from_parent_ref(&slot_path, owner);
-            let slot = slot.resolve_instance();
-            slot.map_mut(|a, _| {
-                a.set_pos(pos);
-            })
-            .unwrap();
-        }
-    }
-
     fn connect_end_turn_clicked(&self, owner: TRef<Node>) {
         // let hand = self.player_hand(owner).unwrap();
         let button: RefInstance<EndTurnButton, Shared> =
@@ -518,11 +447,11 @@ impl World {
     fn connect_boardslot_signals(&self, owner: TRef<Node>) {
         info!("Looking for boardslot children of {:?}", owner.get_path());
 
-        let board = self.board(owner).unwrap();
+        let board = self.board();
 
         for slot_index in 1..=BOARD_SLOT_COUNT {
             let path = format!("{}{}", BOARD_SLOT_PATH_PREFIX, slot_index);
-            if let Some(slot_node) = board.get_node(&path) {
+            if let Some(slot_node) = board.base().get_node(&path) {
                 let slot_node = unsafe { slot_node.assume_safe() };
                 info!("Found board slot {:?}", slot_node.get_path());
 
