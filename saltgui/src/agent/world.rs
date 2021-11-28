@@ -217,8 +217,8 @@ impl World {
             index: event.pos.row_index,
         };
 
-        let board = self.board();
-        let slot = board.map(|b, _| b.get_slot(slot_pos)).unwrap();
+        // let board = self.board();
+        // let slot = board.map(|b, _| b.get_slot(slot_pos)).unwrap();
 
         let slot_index = self.boardslot_from_pos(owner, slot_pos);
         let slot_path = format!(

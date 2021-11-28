@@ -54,15 +54,6 @@ impl GameClient for GuiClient {
         todo!()
     }
 
-    async fn observe_state_update(
-        &mut self,
-        game_state: salt_engine::game_state::GameStatePlayerView,
-    ) {
-        info!("GuiClient::observe_state_update()");
-        let message = ToGui::StateUpdate(game_state);
-        self.channel.send(message).await.unwrap();
-    }
-
     async fn make_notifier(&self) -> Box<dyn salt_engine::game_agent::ClientNotifier> {
         Box::new(GuiNotifier::new(self.channel.clone()))
     }
